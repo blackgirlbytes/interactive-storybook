@@ -25,8 +25,8 @@ Use HTTPS outside localhost for microphone access. Chrome and Edge are recommend
 
 ## Providers
 
-- Deepgram Nova-3: streaming transcription, interim-result barge-in and end-of-utterance detection. Browser connections use short-lived JWTs, not the server key.
-- Deepgram Aura-2: a narrator and separate character voices. MP3 playback starts while downloading on MediaSource-capable browsers, with full-blob playback as a fallback.
+- Deepgram Flux STT (`flux-general-en`, `/v2/listen`): streaming transcription with model-driven turn detection. Interim transcripts stop narration; `EndOfTurn` submits the child's complete idea. Opus microphone audio streams in roughly 80 ms chunks. Browser connections use short-lived JWTs, not the server key.
+- Deepgram Flux TTS (`/v2/speak`): a narrator and separate character voices from 36 English voices. Legacy Aura-2 voice names map to Flux voices when generating new audio; saved recordings still replay unchanged. MP3 playback starts while downloading on MediaSource-capable browsers, with full-blob playback as a fallback.
 - fal OpenRouter chat-completions endpoint: JSON story turns and guided story creation, with schema validation and one retry. The originally planned `fal-ai/any-llm` is deprecated; its replacement still uses only `FAL_KEY`.
 - fal FLUX schnell: first illustration. FLUX Kontext dev (20 steps): faster reference-image edits, with schnell fallback. Illustrations load in the background.
 - fal H3 Max Turbo (`minimax/h3-max-turbo/image-to-video`): each new picture becomes a muted 5-second 768P loop (same first and last frame) that fades in over the still when ready, usually well after narration starts. About $0.09 per clip at current pricing. Set `FAL_VIDEO_MODEL` to another fal image-to-video endpoint with the same inputs, or to `off` to keep still pictures. Saved adventures keep the clips.

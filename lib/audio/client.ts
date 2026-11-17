@@ -156,18 +156,21 @@ export class Microphone {
   private stream?: MediaStream;
   private socket?: WebSocket;
   private recorder?: MediaRecorder;
-  private keepalive?: ReturnType<typeof setInterval>;
   private stopped = false;
 
   async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone needs HTTPS or localhost and a supported browser.");
+    // Flux accepts Opus in WebM or Ogg containers; other recorder formats would be rejected.
+    const mimeType = typeof MediaRecorder !== "undefined" && ["audio/webm;codecs=opus", "audio/ogg;codecs=opus"].find(t => MediaRecorder.isTypeSupported(t));
+    if (!mimeType) throw new Error("This browser can’t stream microphone audio to the story. Try Chrome, Edge or Firefox.");
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     if (this.stopped) { this.stop(); return; }
     try {
       const { token } = await post<{ token: string }>("/api/deepgram-token", {});
       if (this.stopped) { this.stop(); return; }
-      const params = new URLSearchParams({ model: "nova-3", language: "en-US", interim_results: "true", smart_format: "true", endpointing: "350", utterance_end_ms: "1000", vad_events: "true" });
-      const socket = this.socket = new WebSocket(`wss://api.deepgram.com/v1/listen?${params}`, ["bearer", token]);
+      // Children often pause mid-idea, so give Flux up to 3 s of silence before it must end the turn.
+      const params = new URLSearchParams({ model: "flux-general-en", eot_threshold: "0.7", eot_timeout_ms: "3000" });
+      const socket = this.socket = new WebSocket(`wss://api.deepgram.com/v2/listen?${params}`, ["bearer", token]);
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Microphone connection timed out.")), 10000);
         socket.onopen = () => { clearTimeout(timeout); resolve(); };
@@ -175,32 +178,28 @@ export class Microphone {
         socket.onclose = () => { clearTimeout(timeout); reject(new Error("Microphone connection closed.")); };
       });
       if (this.stopped) { this.stop(); return; }
-      let pending = "";
-      const flush = () => { if (pending.trim()) onFinal(pending.trim()); pending = ""; };
       socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        const text = msg.channel?.alternatives?.[0]?.transcript;
-        if (text) {
-          onInterim(text);
-          if (msg.is_final) pending += ` ${text}`;
-        }
-        if (msg.speech_final || msg.type === "UtteranceEnd") flush();
+        const msg = JSON.parse(event.data) as { type?: string; event?: string; transcript?: string; description?: string };
+        if (msg.type === "Error" || msg.type === "FatalError") { this.stop(); onError(`Microphone error: ${msg.description ?? "Deepgram stopped listening."}`); return; }
+        if (msg.type !== "TurnInfo") return;
+        const text = msg.transcript?.trim() ?? "";
+        if (msg.event === "EndOfTurn") { if (text) onFinal(text); }
+        else if (text) onInterim(text);
       };
       socket.onclose = () => { if (!this.stopped) { this.stop(); onError("The microphone disconnected. Turn Play mode on again to reconnect."); } };
       socket.onerror = () => onError("Microphone connection error.");
-      const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find(t => MediaRecorder.isTypeSupported(t));
-      this.recorder = new MediaRecorder(this.stream, mimeType ? { mimeType } : undefined);
+      this.recorder = new MediaRecorder(this.stream, { mimeType });
       this.recorder.ondataavailable = e => { if (e.data.size && socket.readyState === WebSocket.OPEN) socket.send(e.data); };
-      this.recorder.start(100);
-      this.keepalive = setInterval(() => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "KeepAlive" })); }, 5000);
+      // Deepgram recommends roughly 80 ms of audio per message for Flux.
+      this.recorder.start(80);
     } catch (err) { this.stop(); throw err; }
   }
 
   stop() {
     this.stopped = true;
-    clearInterval(this.keepalive);
     if (this.recorder?.state === "recording") this.recorder.stop();
     this.stream?.getTracks().forEach(t => t.stop());
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: "CloseStream" }));
     this.socket?.close();
   }
 }

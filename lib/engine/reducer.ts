@@ -53,7 +53,7 @@ function mergeCharacters(state: StoryState, turn: Turn): CharacterCard[] {
     if (findCharacter(characters, add.name)) continue;
     let id = slugify(add.name);
     while (characters.some((c) => c.id === id)) id += "-2";
-    const used = [state.story.narratorVoice, ...characters.map((c) => c.voice)];
+    const used = [state.story.narratorVoice, ...characters.map((c) => c.voice)].map((v) => normalizeVoice(v) ?? v);
     const requested = normalizeVoice(add.voice);
     const voice = requested && !used.includes(requested) ? requested : pickUnusedVoice(used);
     characters.push({ id, name: add.name, personality: add.personality, look: add.look, voice, invented: true });

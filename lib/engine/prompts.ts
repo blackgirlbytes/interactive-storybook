@@ -1,5 +1,5 @@
 import type { StoryState } from "@/lib/types";
-import { AURA_VOICES } from "@/lib/voices";
+import { FLUX_VOICES } from "@/lib/voices";
 
 const SAFETY = `SAFETY (most important):
 - The listener is a young child (ages 4-9). Everything must be gentle, kind and age-appropriate.
@@ -107,9 +107,10 @@ Respond with ONLY JSON:
 
 When finished, set done true, make "say" an excited line like "Ooh, I love it! Let's begin!" and fill "story":
 {"title": "...", "emoji": "one emoji", "blurb": "one sentence", "setting": "visual description of the world",
- "characters": [{"name": "...", "personality": "...", "look": "short visual description", "voice": "one of: ${AURA_VOICES.join(", ")}"}],
+ "characters": [{"name": "...", "personality": "...", "look": "short visual description", "voice": "a voice name from the list below"}],
  "beats": [{"title": "...", "goal": "what happens in this part"}]}
-Use 2-4 characters and 4-6 beats with a clear beginning, a fun problem, and a happy ending. Use the child's ideas faithfully. Give each character a different voice.`;
+Use 2-4 characters and 4-6 beats with a clear beginning, a fun problem, and a happy ending. Use the child's ideas faithfully. Give each character a different voice that fits who they are. Voices (name: description):
+${FLUX_VOICES.map((v) => `- ${v.name}: ${v.desc}`).join("\n")}`;
 
 export function buildCreateUser(messages: { role: "guide" | "child"; text: string }[]): string {
   if (messages.length === 0) return "Start the conversation: greet the child and ask who the hero of their story should be.";
