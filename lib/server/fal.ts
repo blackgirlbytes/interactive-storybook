@@ -98,3 +98,37 @@ export async function falImage(endpoint: string, input: Record<string, unknown>,
   if (!url) throw new Error(`fal ${endpoint} returned no image`);
   return url;
 }
+
+const QUEUE_BASE = "https://queue.fal.run";
+
+const videoSetting = process.env.FAL_VIDEO_MODEL?.trim();
+/** Empty when clips are turned off with FAL_VIDEO_MODEL=off. */
+export const VIDEO_MODEL = videoSetting === "off" ? "" : videoSetting || "minimax/h3-max-turbo/image-to-video";
+
+// Queue status and result URLs use only the owner/app part of an endpoint id.
+const queueApp = (endpoint: string) => endpoint.split("/").slice(0, 2).join("/");
+
+async function queueFetch<T>(url: string, signal: AbortSignal | undefined, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    signal,
+    headers: { Authorization: `Key ${falKey()}`, "Content-Type": "application/json" },
+  });
+  if (!res.ok) throw new Error(`fal queue error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  return (await res.json()) as T;
+}
+
+export async function falQueueSubmit(endpoint: string, input: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
+  const data = await queueFetch<{ request_id?: string }>(`${QUEUE_BASE}/${endpoint}`, signal, { method: "POST", body: JSON.stringify(input) });
+  if (!data.request_id) throw new Error(`fal ${endpoint} did not accept the job`);
+  return data.request_id;
+}
+
+export async function falQueueStatus(endpoint: string, id: string, signal?: AbortSignal): Promise<string> {
+  const data = await queueFetch<{ status?: string }>(`${QUEUE_BASE}/${queueApp(endpoint)}/requests/${id}/status`, signal);
+  return data.status ?? "UNKNOWN";
+}
+
+export function falQueueResult<T>(endpoint: string, id: string, signal?: AbortSignal): Promise<T> {
+  return queueFetch<T>(`${QUEUE_BASE}/${queueApp(endpoint)}/requests/${id}`, signal);
+}

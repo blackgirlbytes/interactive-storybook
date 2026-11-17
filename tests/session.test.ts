@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLASSIC_STORIES } from "@/lib/stories";
-const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn() }));
+const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn() }));
 vi.mock("@/lib/audio/client", () => ({ ...mocks, Microphone: class { stop() {} } }));
 import { StorySession } from "@/lib/audio/session";
 const story = CLASSIC_STORIES[2];
@@ -88,5 +88,27 @@ describe("session lifecycle", () => {
     expect(unused.aborted).toBe(true);
     expect(mocks.streamTurn.mock.calls[2][0].log.at(-1).text).toContain("roller skates");
     s.close();
+  });
+  it("animates a new picture and shares the clip with pages that reuse it", async () => {
+    const image = new Blob(["image"], { type: "image/jpeg" });
+    const video = new Blob(["video"], { type: "video/mp4" });
+    const fetchMock = vi.fn(async () => new Response(image));
+    vi.stubGlobal("fetch", fetchMock);
+    mocks.post.mockResolvedValue({ url: "https://v3.fal.media/files/scene.jpg", dataUri: "data:image/jpeg;base64,aW1hZ2U=" });
+    let finish!: (blob: Blob) => void;
+    mocks.animateScene.mockImplementation(() => new Promise(r => { finish = r; }));
+    mocks.streamTurn.mockImplementationOnce(async (_state, _signal, onSegment) => { reply.segments.forEach(onSegment); return { ...reply, imagePrompt: "Hare naps under a tree" }; });
+    const s = new StorySession(story, () => {});
+    await s.turn();
+    await vi.waitFor(() => expect(mocks.animateScene).toHaveBeenCalledOnce());
+    expect(mocks.animateScene.mock.calls[0].slice(0, 2)).toEqual(["https://v3.fal.media/files/scene.jpg", "Hare naps under a tree"]);
+    expect(s.view.videoBusy).toBe(true);
+    await s.turn("The hare wakes up");
+    expect(s.view.pages).toHaveLength(2);
+    finish(video);
+    await vi.waitFor(() => expect(s.view.videoBusy).toBe(false));
+    expect(s.view.pages.map(p => p.video)).toEqual([video, video]);
+    s.close();
+    vi.unstubAllGlobals();
   });
 });

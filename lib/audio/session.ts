@@ -2,7 +2,7 @@ import type { Mode, StoryDef, StoryState } from "@/lib/types";
 import { initialState, applyTurn, addChildUtterance, findCharacter } from "@/lib/engine/reducer";
 import { TurnSchema, type Turn } from "@/lib/engine/schema";
 import type { StreamedSegment } from "@/lib/engine/streamSegments";
-import { Microphone, playBlob, post, speech, speechAudio, streamTurn, type SpeechAudio } from "./client";
+import { animateScene, Microphone, playBlob, post, speech, speechAudio, streamTurn, type SpeechAudio } from "./client";
 import type { AdventurePage } from "@/lib/db";
 import { isLikelyEcho } from "@/lib/engine/echo";
 
@@ -13,6 +13,7 @@ export interface SessionView {
   error: string;
   listening: boolean;
   imageBusy: boolean;
+  videoBusy: boolean;
 }
 interface PreparedTurn {
   state: StoryState;
@@ -31,6 +32,7 @@ export class StorySession {
   private referenceUrl?: string;
   private imageJobs = new Set<Promise<void>>();
   private imageControllers = new Set<AbortController>();
+  private videoJobs = 0;
   private closed = false;
   private paused = true;
   private pendingPage?: AdventurePage;
@@ -39,7 +41,7 @@ export class StorySession {
   private snapshotting = false;
   private prefetched?: PreparedTurn;
   constructor(story: StoryDef, private update: (view: SessionView) => void, restored?: SessionView) {
-    this.view = restored ? { ...restored, listening: false, imageBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, imageBusy: false };
+    this.view = restored ? { ...restored, listening: false, imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, imageBusy: false, videoBusy: false };
   }
   private emit() { if (!this.closed) this.update({ ...this.view, pages: [...this.view.pages] }); }
   warmup() {
@@ -129,7 +131,8 @@ export class StorySession {
       const prepared = this.prefetched ?? this.prepare(base);
       this.prefetched = undefined;
       controller = this.controller = prepared.controller;
-      const page: AdventurePage = { segments: [], audio: [], image: this.view.pages.at(-1)?.image };
+      const previous = this.view.pages.at(-1);
+      const page: AdventurePage = { segments: [], audio: [], image: previous?.image, video: previous?.video };
       let attached = false;
       let queued = 0;
       let playback = Promise.resolve();
@@ -192,12 +195,27 @@ export class StorySession {
       try {
         const data = await post<{ url: string; dataUri: string }>("/api/image", { scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, referenceUrl: this.referenceUrl }, controller.signal);
         if (this.closed) return;
-        page.image = await (await fetch(data.dataUri)).blob();
+        const image = page.image = await (await fetch(data.dataUri)).blob();
+        page.video = undefined;
         if (this.view.pages.at(-1) === page) this.referenceUrl = data.url;
+        this.animate(image, data.url, scene);
       } catch (e) { if (!this.closed && (e as Error).name !== "AbortError") this.view.error = `Illustration: ${(e as Error).message}`; }
     })();
     this.imageJobs.add(job);
     void job.finally(() => { this.imageJobs.delete(job); this.imageControllers.delete(controller); this.view.imageBusy = this.imageJobs.size > 0; this.emit(); });
+  }
+  private animate(image: Blob, imageUrl: string, scene: string) {
+    const controller = new AbortController();
+    this.imageControllers.add(controller);
+    this.videoJobs++; this.view.videoBusy = true; this.emit();
+    void animateScene(imageUrl, scene, controller.signal)
+      .then(video => {
+        if (!video || this.closed) return;
+        // Later pages that reuse this picture should move too.
+        for (const p of this.view.pages) if (p.image === image) p.video = video;
+      })
+      .catch(e => { if ((e as Error).name !== "AbortError") console.warn("Scene animation failed:", e); })
+      .finally(() => { this.imageControllers.delete(controller); this.videoJobs--; this.view.videoBusy = this.videoJobs > 0; this.emit(); });
   }
   async snapshot() {
     this.snapshotting = true;

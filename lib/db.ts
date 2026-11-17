@@ -5,6 +5,7 @@ export interface AdventurePage {
   segments: SpokenSegment[];
   audio: Blob[];
   image?: Blob;
+  video?: Blob;
   scene?: string;
 }
 export interface Adventure {

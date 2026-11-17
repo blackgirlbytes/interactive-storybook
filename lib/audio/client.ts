@@ -204,3 +204,26 @@ export class Microphone {
     this.socket?.close();
   }
 }
+const VIDEO_POLL_MS = 3000;
+const VIDEO_TIMEOUT_MS = 5 * 60_000;
+
+/** Turns a finished picture into a looping clip. Resolves undefined when clips are turned off. */
+export async function animateScene(imageUrl: string, scene: string, signal: AbortSignal): Promise<Blob | undefined> {
+  const job = await post<{ id?: string; disabled?: boolean }>("/api/video", { imageUrl, scene }, signal);
+  if (job.disabled || !job.id) return undefined;
+  const deadline = Date.now() + VIDEO_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(resolve, VIDEO_POLL_MS);
+      signal.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("Stopped", "AbortError")); }, { once: true });
+    });
+    const res = await fetch(`/api/video?id=${encodeURIComponent(job.id)}`, { signal });
+    if (res.status === 202) continue;
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "The moving picture couldn’t be made.");
+    }
+    return res.blob();
+  }
+  throw new Error("The moving picture took too long.");
+}
