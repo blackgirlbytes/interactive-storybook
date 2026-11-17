@@ -1,0 +1,61 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M7M3FN3MD411N2WP93PYXXCK",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/api/create/route.ts",
+    "app/api/deepgram-token/route.ts",
+    "app/api/image/route.ts",
+    "app/api/tts/route.ts",
+    "app/api/turn/route.ts",
+    "app/globals.css",
+    "app/layout.tsx",
+    "lib/engine/echo.ts",
+    "lib/engine/imagePrompt.ts",
+    "lib/engine/prompts.ts",
+    "lib/engine/reducer.ts",
+    "lib/engine/schema.ts",
+    "lib/engine/stateSchema.ts",
+    "lib/engine/streamSegments.ts",
+    "lib/server/deepgram.ts",
+    "lib/server/errors.ts",
+    "lib/server/fal.ts",
+    "lib/server/generate.ts",
+    "lib/stories/index.ts",
+    "lib/types.ts",
+    "lib/voices.ts",
+    "tests/engine.test.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 23
+  },
+  "redaction": {
+    "replacements": 94,
+    "layers": {
+      "betterleaks": 30,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 11,
+      "credentialed_uri": 0,
+      "entropy": 57,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
