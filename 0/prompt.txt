@@ -1,0 +1,49 @@
+connect to the fal mcp server https://fal.ai/docs/documentation/setting-up/mcp
+
+---
+
+ok done
+
+---
+
+okay here's one thing the images are so still..i wanted it to be more closer to video..what are my options
+
+---
+
+undo this change go back to how the latest changes are on github..this change we did with subtle movement regressed the app
+
+---
+
+i think we need to try  a video soluion like kling or h3 ..my issue is when we changed to subtle movement..then there was no change in the images at all..i didnt even ask it to have a change during the story. it was just the baseline story with the same images..just in different resolution and sizes
+
+---
+
+what is fal's responsibility or role here..what is it making happen? what about deepgram? i suppose deepgram is allowing interruptions
+
+---
+
+why arent we using flux
+
+---
+
+no i meant flux in deepgram
+
+---
+
+should we use flux for responding too
+
+---
+
+are u sure
+
+---
+
+what about RCS
+
+---
+
+okay lets just switch to flux for now for listening and speaking
+
+---
+
+commit and push changes
