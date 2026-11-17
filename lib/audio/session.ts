@@ -1,0 +1,224 @@
+import type { Mode, StoryDef, StoryState } from "@/lib/types";
+import { initialState, applyTurn, addChildUtterance, findCharacter } from "@/lib/engine/reducer";
+import { TurnSchema, type Turn } from "@/lib/engine/schema";
+import type { StreamedSegment } from "@/lib/engine/streamSegments";
+import { Microphone, playBlob, post, speech, speechAudio, streamTurn, type SpeechAudio } from "./client";
+import type { AdventurePage } from "@/lib/db";
+import { isLikelyEcho } from "@/lib/engine/echo";
+
+export interface SessionView {
+  state: StoryState;
+  pages: AdventurePage[];
+  status: string;
+  error: string;
+  listening: boolean;
+  imageBusy: boolean;
+}
+interface PreparedTurn {
+  state: StoryState;
+  controller: AbortController;
+  segments: StreamedSegment[];
+  audio: (SpeechAudio | undefined)[];
+  done: Promise<Turn>;
+  notify?: () => void;
+}
+export class StorySession {
+  view: SessionView;
+  private controller?: AbortController;
+  private mic?: Microphone;
+  private generation = 0;
+  private timer?: ReturnType<typeof setTimeout>;
+  private referenceUrl?: string;
+  private imageJobs = new Set<Promise<void>>();
+  private imageControllers = new Set<AbortController>();
+  private closed = false;
+  private paused = true;
+  private pendingPage?: AdventurePage;
+  private recentlySpoken = "";
+  private spokenAt = 0;
+  private snapshotting = false;
+  private prefetched?: PreparedTurn;
+  constructor(story: StoryDef, private update: (view: SessionView) => void, restored?: SessionView) {
+    this.view = restored ? { ...restored, listening: false, imageBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, imageBusy: false };
+  }
+  private emit() { if (!this.closed) this.update({ ...this.view, pages: [...this.view.pages] }); }
+  warmup() {
+    if (!this.closed && !this.prefetched && this.view.state.mode === "listen" && !this.view.state.ended) {
+      this.prefetched = this.prepare(this.view.state);
+    }
+  }
+  private discardPrefetch() { this.prefetched?.controller.abort(); this.prefetched = undefined; }
+  private prepare(state: StoryState): PreparedTurn {
+    const controller = new AbortController();
+    const prepared: PreparedTurn = { state, controller, segments: [], audio: [], done: undefined! };
+    prepared.done = streamTurn(state, controller.signal, segment => {
+      if (controller.signal.aborted) return;
+      prepared.segments.push(segment);
+      const character = findCharacter(state.characters, segment.speaker);
+      // New characters need the final metadata before choosing their own voice.
+      prepared.audio.push(segment.speaker === "narrator" || character
+        ? speechAudio(segment.text, character?.voice ?? state.story.narratorVoice, controller.signal)
+        : undefined);
+      prepared.notify?.();
+    }).then(turn => {
+      const spoken = applyTurn(state, turn).spoken;
+      prepared.segments = turn.segments;
+      spoken.forEach((segment, i) => {
+        prepared.audio[i] ??= speechAudio(segment.text, segment.voice, controller.signal);
+      });
+      return turn;
+    });
+    void prepared.done.catch(() => {});
+    return prepared;
+  }
+  stopTurn() { clearTimeout(this.timer); this.generation++; this.controller?.abort(); }
+  pause() { this.paused = true; this.stopTurn(); this.discardPrefetch(); this.view.status = "Paused"; this.emit(); }
+  async mode(mode: Mode) {
+    this.discardPrefetch();
+    this.mic?.stop(); this.mic = undefined;
+    this.view.state = { ...this.view.state, mode }; this.view.listening = false;
+    this.emit();
+    if (mode === "play") {
+      const mic = this.mic = new Microphone();
+      try {
+        await mic.start(
+          text => { if (!this.closed && this.mic === mic && !this.echo(text)) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
+          text => { if (this.mic === mic && !this.echo(text)) void this.turn(text); },
+          error => { this.view.error = error; this.view.listening = false; this.emit(); },
+        );
+        if (this.mic === mic && !this.closed) this.view.listening = true;
+      } catch (e) { this.view.error = String((e as Error).message); }
+      this.emit();
+    }
+  }
+  private echo(text: string) { return Date.now() - this.spokenAt < 15000 && isLikelyEcho(text, this.recentlySpoken); }
+  private async narrate(page: AdventurePage, controller: AbortController, current: () => boolean) {
+    const loads = page.segments.map((s,i) => page.audio[i] ? Promise.resolve(page.audio[i]) : speech(s.text, s.voice, controller.signal));
+    loads.forEach(p => { void p.catch(() => {}); });
+    for (let i = 0; i < loads.length; i++) {
+      const blob = await loads[i];
+      if (!current()) return;
+      page.audio[i] = blob;
+      this.recentlySpoken = page.segments[i].text; this.spokenAt = Date.now() + page.segments[i].text.length * 90;
+      this.view.status = `${page.segments[i].speakerName} is speaking`; this.emit();
+      await playBlob(blob, controller.signal);
+      this.spokenAt = Date.now();
+    }
+  }
+  async turn(text?: string) {
+    if (this.closed || this.snapshotting || (this.view.state.ended && !text && !this.pendingPage)) return;
+    this.stopTurn(); this.paused = false;
+    const generation = this.generation;
+    let controller = this.controller = new AbortController();
+    const current = () => !this.closed && generation === this.generation;
+    if (text) this.view.state = { ...addChildUtterance(this.view.state, text), ended: false };
+    this.view.error = ""; this.view.status = "Turning your ideas into a story…"; this.emit();
+    try {
+      if (!text && this.pendingPage) {
+        const page = this.pendingPage;
+        await this.narrate(page, controller, current);
+        if (!current()) return;
+        this.pendingPage = undefined;
+        this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : "Ready for the next page"; this.emit();
+        if (!this.view.state.ended) this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
+        return;
+      }
+      this.pendingPage = undefined;
+      const base = this.view.state;
+      if (text || this.prefetched?.state !== base) this.discardPrefetch();
+      const prepared = this.prefetched ?? this.prepare(base);
+      this.prefetched = undefined;
+      controller = this.controller = prepared.controller;
+      const page: AdventurePage = { segments: [], audio: [], image: this.view.pages.at(-1)?.image };
+      let attached = false;
+      let queued = 0;
+      let playback = Promise.resolve();
+      const display = (turn: Turn) => {
+        const applied = applyTurn(base, turn);
+        this.view.state = { ...applied.state, mode: this.view.state.mode };
+        page.segments = applied.spoken;
+        if (!attached) {
+          attached = true; this.pendingPage = page; this.view.pages.push(page);
+        }
+        this.emit();
+      };
+      const schedule = () => {
+        while (queued < page.segments.length && prepared.audio[queued]) {
+          const i = queued++;
+          const resource = prepared.audio[i]!;
+          void resource.blob.then(blob => { if (current()) page.audio[i] = blob; }).catch(() => {});
+          playback = playback.then(async () => {
+            if (!current()) return;
+            const segment = page.segments[i];
+            this.recentlySpoken = segment.text; this.spokenAt = Date.now() + segment.text.length * 90;
+            this.view.status = `${segment.speakerName} is speaking`; this.emit();
+            await resource.play();
+            page.audio[i] = await resource.blob;
+            this.spokenAt = Date.now();
+          });
+          void playback.catch(() => {});
+        }
+      };
+      prepared.notify = () => {
+        if (!current()) return;
+        display(TurnSchema.parse({ segments: prepared.segments }));
+        schedule();
+      };
+      if (prepared.segments.length) prepared.notify();
+      const turn = await prepared.done;
+      if (!current()) return;
+      display(turn);
+      page.scene = turn.imagePrompt ?? undefined;
+      if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt);
+      schedule();
+      // Generate one page ahead while the current narration is playing.
+      this.warmup();
+      await playback;
+      if (!current()) return;
+      this.pendingPage = undefined;
+      this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : turn.awaitChild ? "What happens next? Tell me!" : "A little more magic…"; this.emit();
+      if (!this.view.state.ended && !(turn.awaitChild && this.view.state.mode === "play")) {
+        this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
+      }
+    } catch (e) {
+      if (current() && (e as Error).name !== "AbortError") { controller.abort(); this.discardPrefetch(); this.view.error = (e as Error).message; this.view.status = "Let’s try that again"; this.emit(); }
+    }
+  }
+  private illustrate(page: AdventurePage, scene: string) {
+    const controller = new AbortController();
+    this.imageControllers.add(controller);
+    this.view.imageBusy = true; this.emit();
+    const job = (async () => {
+      try {
+        const data = await post<{ url: string; dataUri: string }>("/api/image", { scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, referenceUrl: this.referenceUrl }, controller.signal);
+        if (this.closed) return;
+        page.image = await (await fetch(data.dataUri)).blob();
+        if (this.view.pages.at(-1) === page) this.referenceUrl = data.url;
+      } catch (e) { if (!this.closed && (e as Error).name !== "AbortError") this.view.error = `Illustration: ${(e as Error).message}`; }
+    })();
+    this.imageJobs.add(job);
+    void job.finally(() => { this.imageJobs.delete(job); this.imageControllers.delete(controller); this.view.imageBusy = this.imageJobs.size > 0; this.emit(); });
+  }
+  async snapshot() {
+    this.snapshotting = true;
+    this.pause();
+    this.mic?.stop(); this.mic = undefined; this.view.listening = false; this.emit();
+    try {
+      await Promise.all([...this.imageJobs]);
+      // Interrupted pages still need complete audio for offline replay.
+      for (const page of this.view.pages) {
+        for (let i = 0; i < page.segments.length; i++) {
+          if (!page.audio[i]) {
+            const s = page.segments[i];
+            page.audio[i] = await speech(s.text, s.voice, AbortSignal.timeout(30000));
+          }
+        }
+      }
+      return structuredClone({ story: this.view.state.story, state: this.view.state, pages: this.view.pages });
+    } finally { this.snapshotting = false; }
+  }
+  close() {
+    this.closed = true; this.stopTurn(); this.discardPrefetch(); this.mic?.stop();
+    this.imageControllers.forEach(c => c.abort());
+  }
+}
