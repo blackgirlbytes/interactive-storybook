@@ -1,0 +1,25 @@
+i think the changes were made on main now so you can get ur branch on main
+
+---
+
+can we run this project locally
+
+---
+
+why does the page take so long to turn sometimes
+
+---
+
+im on play & talk and its waiting for me
+
+---
+
+but i havent said anything
+
+---
+
+maybe if i havent said anything after a certain amount of time it should just turn the page..right? like if it heard typing or something..it should be able to differentiate..do you have deepgram skills to figure out how to do that..is that possible
+
+---
+
+i think though we mightve taken that out earlier..hmmm can you check entire to see if we took that out and now maybe we're just adding that back in
