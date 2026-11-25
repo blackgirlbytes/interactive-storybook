@@ -177,6 +177,29 @@ describe("session lifecycle", () => {
     expect(s.view.state.log.some(entry => entry.kind === "child" && entry.text.includes("roller skates"))).toBe(true);
     s.close();
   });
+  it("pauses only the microphone and resumes it without stopping the story", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    await s.turn();
+    const pagesBefore = s.view.pages.length;
+    const oldFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
+    s.pauseMicrophone();
+    expect(mocks.micFinish).toHaveBeenCalledOnce();
+    expect(s.view.listening).toBe(false);
+    expect(s.view.micPaused).toBe(true);
+    expect(s.view.status).toBe("Microphone paused. Story continues.");
+    expect(s.view.pauseMode).toBe("none");
+    oldFinal("An ignored late answer");
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(s.view.pages.length).toBeGreaterThan(pagesBefore);
+    s.view.error = "Previous microphone error";
+    await s.resumeMicrophone();
+    expect(mocks.micStart).toHaveBeenCalledTimes(2);
+    expect(s.view.listening).toBe(true);
+    expect(s.view.micPaused).toBe(false);
+    expect(s.view.error).toBe("");
+    s.close();
+  });
   it("stops listening with a full pause and reconnects on resume", async () => {
     const s = new StorySession(story, () => {});
     await s.mode("play");

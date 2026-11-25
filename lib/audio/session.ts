@@ -19,6 +19,7 @@ export interface SessionView {
   status: string;
   error: string;
   listening: boolean;
+  micPaused: boolean;
   pauseMode: "none" | "narrator" | "all";
   imageBusy: boolean;
   videoBusy: boolean;
@@ -69,7 +70,7 @@ export class StorySession {
   private lastWords?: Promise<void>;
   private prefetched?: PreparedTurn;
   constructor(story: StoryDef, private update: (view: SessionView) => void, restored?: SessionView) {
-    this.view = restored ? { ...restored, reading: undefined, listening: false, pauseMode: "none", imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, pauseMode: "none", imageBusy: false, videoBusy: false };
+    this.view = restored ? { ...restored, reading: undefined, listening: false, micPaused: false, pauseMode: "none", imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, micPaused: false, pauseMode: "none", imageBusy: false, videoBusy: false };
   }
   private emit() { if (!this.closed) this.update({ ...this.view, pages: [...this.view.pages] }); }
   warmup() {
@@ -117,6 +118,7 @@ export class StorySession {
       this.lastWords = words;
     }
     this.view.listening = false;
+    this.view.micPaused = true;
     this.view.pauseMode = "all";
     this.view.status = "Story and microphone paused";
     this.emit();
@@ -133,6 +135,32 @@ export class StorySession {
     this.rememberHeardNarration();
     this.view.state = { ...addChildUtterance(this.view.state, text), ended: false };
     this.emit();
+  }
+  private canAcceptMicrophoneWords() {
+    return !this.closed && this.view.state.mode === "play" && this.view.pauseMode !== "all";
+  }
+  /** Stops only the microphone; narration and its automatic continuation keep running. */
+  pauseMicrophone() {
+    if (this.view.state.mode !== "play" || this.view.pauseMode === "all") return;
+    const mic = this.mic; this.mic = undefined;
+    this.view.listening = false;
+    this.view.micPaused = true;
+    this.view.status = this.view.pauseMode === "narrator" ? "Narrator and microphone paused" : "Microphone paused. Story continues.";
+    this.emit();
+    if (mic) {
+      const words: Promise<void> = mic.finish().then(text => {
+        if (text && this.canAcceptMicrophoneWords() && !this.echo(text)) void this.turn(text);
+      }).catch(() => {}).finally(() => { if (this.lastWords === words) this.lastWords = undefined; });
+      this.lastWords = words;
+    }
+  }
+  async resumeMicrophone() {
+    if (!this.canAcceptMicrophoneWords() || !this.view.micPaused) return;
+    if (this.lastWords) await this.lastWords;
+    if (!this.canAcceptMicrophoneWords() || !this.view.micPaused) return;
+    this.view.micPaused = false;
+    this.emit();
+    await this.startMicrophone(false, true);
   }
   async resume() {
     if (this.lastWords) await this.lastWords;
@@ -189,7 +217,7 @@ export class StorySession {
     }
     this.discardPrefetch();
     this.mic?.stop(); this.mic = undefined;
-    this.view.state = { ...this.view.state, mode }; this.view.listening = false;
+    this.view.state = { ...this.view.state, mode }; this.view.listening = false; this.view.micPaused = false;
     if (this.view.pauseMode === "all" && mode === "listen") {
       this.view.pauseMode = "narrator";
       this.view.status = "Narrator paused";
@@ -198,28 +226,33 @@ export class StorySession {
     if (wasAwaitingChild && mode === "listen" && !this.view.state.ended) {
       this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, AUTO_CONTINUE_MS);
     }
-    if (mode === "play") {
+    if (mode === "play") await this.startMicrophone(wasAwaitingChild);
+  }
+  private async startMicrophone(wasAwaitingChild: boolean, resumed = false) {
       const mic = this.mic = new Microphone(storyLanguage(this.view.state.story));
       try {
         await mic.start(
           text => { if (!this.closed && this.mic === mic && !this.echo(text)) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
           text => { if (this.mic === mic && !this.echo(text)) void this.turn(text); },
-          error => { this.view.error = error; this.view.listening = false; this.emit(); },
+          error => { if (this.mic !== mic) return; mic.stop(); this.mic = undefined; this.view.error = error; this.view.listening = false; this.view.micPaused = true; this.emit(); },
           () => { if (!this.closed && this.mic === mic) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
         );
         if (this.mic === mic && !this.closed) {
           this.view.listening = true;
+          this.view.micPaused = false;
+          if (resumed) this.view.error = "";
           if (this.view.pauseMode !== "none") {
             this.view.pauseMode = "narrator";
             this.view.status = "Narrator paused. You can speak.";
           } else if (wasAwaitingChild) {
             this.awaitingChild = true;
             this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, CHILD_REPLY_WAIT_MS);
+          } else if (resumed) {
+            this.view.status = "Microphone on. You can speak.";
           }
         }
-      } catch (e) { this.view.error = String((e as Error).message); }
+      } catch (e) { if (this.mic === mic) { this.mic = undefined; this.view.error = String((e as Error).message); this.view.micPaused = true; } }
       this.emit();
-    }
   }
   /** Follows a segment's playback and moves the read-along highlight from word to word. */
   private follow(page: AdventurePage, segment: number, recording: Blob | Promise<Blob>): OnTime {
