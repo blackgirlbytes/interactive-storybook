@@ -98,6 +98,10 @@ footer .brand { color: var(--lamp); }
 .step-icon { border-color: rgba(242, 189, 87, .4); color: var(--lamp-strong); }
 
 /* cards */
+.stories-section .story-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px; }
+.stories-section .story-card { flex: 0 1 calc((100% - 44px) / 3); }
+@media (max-width: 1000px) { .stories-section .story-grid { gap: 15px; } .stories-section .story-card { flex-basis: calc((100% - 30px) / 3); } }
+@media (max-width: 700px) { .stories-section .story-card { flex-basis: calc((100% - 15px) / 2); } }
 .story-card { display: flex; flex-direction: column; background: var(--night-1); border-color: var(--line); }
 .story-card:hover { box-shadow: 0 16px 40px rgba(0, 0, 0, .45), 0 0 0 1px rgba(242, 189, 87, .25); }
 .cover { background: #0b1030; }
