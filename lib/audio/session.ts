@@ -24,6 +24,12 @@ interface PreparedTurn {
   done: Promise<Turn>;
   notify?: () => void;
 }
+interface ActiveNarration {
+  base: StoryState;
+  page: AdventurePage;
+  heardCount: number;
+  referenceUrl?: string;
+}
 export class StorySession {
   view: SessionView;
   private controller?: AbortController;
@@ -37,6 +43,8 @@ export class StorySession {
   private closed = false;
   private paused = true;
   private pendingPage?: AdventurePage;
+  private activeNarration?: ActiveNarration;
+  private abandonedPages = new WeakSet<AdventurePage>();
   private recentlySpoken = "";
   private spokenAt = 0;
   private snapshotting = false;
@@ -97,6 +105,43 @@ export class StorySession {
     }
     await this.turn();
   }
+  /** Discard generated lines that had not finished playing before the child spoke. */
+  private rememberHeardNarration() {
+    const active = this.activeNarration;
+    if (!active || this.pendingPage !== active.page) return;
+    const heard = active.page.segments.slice(0, active.heardCount);
+    const mode = this.view.state.mode;
+    const characters = this.view.state.characters.filter(character =>
+      active.base.characters.some(previous => previous.id === character.id) ||
+      heard.some(segment => segment.speakerId === character.id || segment.text.toLowerCase().includes(character.name.toLowerCase()))
+    );
+    this.view.state = {
+      ...active.base,
+      mode,
+      characters,
+      log: [...active.base.log, ...heard.map(segment => ({
+        kind: segment.speakerId === "narrator" ? "narration" as const : "dialogue" as const,
+        speaker: segment.speakerName,
+        text: segment.text,
+        beatIndex: active.base.beatIndex,
+      }))],
+    };
+    if (heard.length) {
+      active.page.segments = heard;
+      active.page.audio = active.page.audio.slice(0, heard.length);
+      active.page.scene = undefined;
+      const previous = this.view.pages[this.view.pages.indexOf(active.page) - 1];
+      active.page.image = previous?.image;
+      active.page.video = previous?.video;
+    } else {
+      this.view.pages = this.view.pages.filter(page => page !== active.page);
+    }
+    this.abandonedPages.add(active.page);
+    this.referenceUrl = active.referenceUrl;
+    this.pendingPage = undefined;
+    this.activeNarration = undefined;
+    this.emit();
+  }
   async mode(mode: Mode) {
     this.discardPrefetch();
     this.mic?.stop(); this.mic = undefined;
@@ -113,6 +158,7 @@ export class StorySession {
           text => { if (!this.closed && this.mic === mic && !this.echo(text)) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
           text => { if (this.mic === mic && !this.echo(text)) void this.turn(text); },
           error => { this.view.error = error; this.view.listening = false; this.emit(); },
+          () => { if (!this.closed && this.mic === mic) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
         );
         if (this.mic === mic && !this.closed) {
           this.view.listening = true;
@@ -136,11 +182,13 @@ export class StorySession {
       this.recentlySpoken = page.segments[i].text; this.spokenAt = Date.now() + page.segments[i].text.length * 90;
       this.view.status = `${page.segments[i].speakerName} is speaking`; this.emit();
       await playBlob(blob, controller.signal);
+      if (current() && this.activeNarration?.page === page) this.activeNarration.heardCount = Math.max(this.activeNarration.heardCount, i + 1);
       this.spokenAt = Date.now();
     }
   }
   async turn(text?: string) {
     if (this.closed || this.snapshotting || (this.view.state.ended && !text && !this.pendingPage)) return;
+    if (text) this.rememberHeardNarration();
     this.stopTurn(); this.paused = false; this.view.pauseMode = "none";
     const generation = this.generation;
     let controller = this.controller = new AbortController();
@@ -153,6 +201,7 @@ export class StorySession {
         await this.narrate(page, controller, current);
         if (!current()) return;
         this.pendingPage = undefined;
+        this.activeNarration = undefined;
         this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : "Ready for the next page"; this.emit();
         if (!this.view.state.ended) this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
         return;
@@ -165,6 +214,8 @@ export class StorySession {
       controller = this.controller = prepared.controller;
       const previous = this.view.pages.at(-1);
       const page: AdventurePage = { segments: [], audio: [], image: previous?.image, video: previous?.video };
+      const active: ActiveNarration = { base, page, heardCount: 0, referenceUrl: this.referenceUrl };
+      this.activeNarration = active;
       let attached = false;
       let queued = 0;
       let playback = Promise.resolve();
@@ -188,6 +239,8 @@ export class StorySession {
             this.recentlySpoken = segment.text; this.spokenAt = Date.now() + segment.text.length * 90;
             this.view.status = `${segment.speakerName} is speaking`; this.emit();
             await resource.play();
+            if (!current()) return;
+            active.heardCount = Math.max(active.heardCount, i + 1);
             page.audio[i] = await resource.blob;
             this.spokenAt = Date.now();
           });
@@ -211,6 +264,7 @@ export class StorySession {
       await playback;
       if (!current()) return;
       this.pendingPage = undefined;
+      this.activeNarration = undefined;
       this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : turn.awaitChild ? "What happens next? Tell me!" : "A little more magic…"; this.emit();
       if (!this.view.state.ended && !(turn.awaitChild && this.view.state.mode === "play")) {
         this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
@@ -226,8 +280,10 @@ export class StorySession {
     const job = (async () => {
       try {
         const data = await post<{ url: string; dataUri: string }>("/api/image", { scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, referenceUrl: this.referenceUrl }, controller.signal);
-        if (this.closed) return;
-        const image = page.image = await (await fetch(data.dataUri)).blob();
+        if (this.closed || this.abandonedPages.has(page)) return;
+        const image = await (await fetch(data.dataUri)).blob();
+        if (this.closed || this.abandonedPages.has(page)) return;
+        page.image = image;
         page.video = undefined;
         if (this.view.pages.at(-1) === page) this.referenceUrl = data.url;
         this.animate(image, data.url, scene);

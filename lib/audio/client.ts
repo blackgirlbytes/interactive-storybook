@@ -158,7 +158,7 @@ export class Microphone {
   private recorder?: MediaRecorder;
   private stopped = false;
 
-  async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void) {
+  async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void, onSpeechStart?: () => void) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone needs HTTPS or localhost and a supported browser.");
     // Flux accepts Opus in WebM or Ogg containers; other recorder formats would be rejected.
     const mimeType = typeof MediaRecorder !== "undefined" && ["audio/webm;codecs=opus", "audio/ogg;codecs=opus"].find(t => MediaRecorder.isTypeSupported(t));
@@ -183,6 +183,7 @@ export class Microphone {
         if (msg.type === "Error" || msg.type === "FatalError") { this.stop(); onError(`Microphone error: ${msg.description ?? "Deepgram stopped listening."}`); return; }
         if (msg.type !== "TurnInfo") return;
         const text = msg.transcript?.trim() ?? "";
+        if (msg.event === "StartOfTurn") onSpeechStart?.();
         if (msg.event === "EndOfTurn") { if (text) onFinal(text); }
         else if (text) onInterim(text);
       };

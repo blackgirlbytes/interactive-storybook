@@ -74,9 +74,9 @@ describe("Flux TTS route", () => {
 describe("Flux microphone", () => {
   it("uses temporary-token auth and only submits completed turns", async () => {
     fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
-    const interim = vi.fn(), final = vi.fn(), error = vi.fn();
+    const interim = vi.fn(), final = vi.fn(), error = vi.fn(), speechStart = vi.fn();
     const mic = new Microphone();
-    await mic.start(interim, final, error);
+    await mic.start(interim, final, error, speechStart);
     const socket = Socket.latest;
     expect(socket.url).toContain("/v2/listen?model=flux-general-en");
     expect(socket.protocols).toEqual(["bearer", "temporary-token"]);
@@ -85,7 +85,10 @@ describe("Flux microphone", () => {
     const chunk = new Blob(["audio"]);
     Recorder.latest.ondataavailable?.({ data: chunk });
     expect(socket.send).toHaveBeenCalledWith(chunk);
-    socket.message({ type: "TurnInfo", event: "StartOfTurn", transcript: "Um" });
+    socket.message({ type: "TurnInfo", event: "StartOfTurn", transcript: "" });
+    expect(speechStart).toHaveBeenCalledOnce();
+    expect(interim).not.toHaveBeenCalled();
+    socket.message({ type: "TurnInfo", event: "Update", transcript: "Um" });
     socket.message({ type: "TurnInfo", event: "Update", transcript: "Um, give the tortoise roller skates." });
     expect(interim).toHaveBeenCalledTimes(2);
     expect(final).not.toHaveBeenCalled();

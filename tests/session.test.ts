@@ -19,6 +19,56 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 describe("session lifecycle", () => {
+  it("keeps only completed narration in memory when a child interrupts", async () => {
+    const segments = [
+      { speaker: "narrator", text: "The dragon found a silver key." },
+      { speaker: "narrator", text: "She opened the garden gate." },
+      { speaker: "narrator", text: "A tiny fox ran out." },
+    ];
+    mocks.streamTurn.mockImplementationOnce(async (_state, _signal, onSegment) => {
+      segments.forEach(onSegment);
+      return { ...reply, segments, stateChanges: { addObjects: ["a tiny fox"] }, advanceBeat: true };
+    });
+    let plays = 0;
+    mocks.playBlob.mockImplementation((_blob, signal: AbortSignal) => {
+      if (++plays !== 2) return Promise.resolve();
+      return new Promise((_, reject) => signal.addEventListener("abort", () => reject(new DOMException("Stopped", "AbortError")), { once: true }));
+    });
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    const firstTurn = s.turn();
+    await vi.waitFor(() => expect(mocks.playBlob).toHaveBeenCalledTimes(2));
+    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
+    onSpeechStart();
+    await firstTurn;
+    await s.turn("Give the dragon a balloon instead");
+    const nextState = mocks.streamTurn.mock.calls[1][0];
+    expect(nextState.log.map((entry: { text: string }) => entry.text)).toEqual([
+      "The dragon found a silver key.",
+      "Give the dragon a balloon instead",
+    ]);
+    expect(nextState.objects).not.toContain("a tiny fox");
+    expect(nextState.beatIndex).toBe(0);
+    expect(s.view.pages[0].segments.map(segment => segment.text)).toEqual(["The dragon found a silver key."]);
+    s.close();
+  });
+  it("forgets a page when the child interrupts before its first line finishes", async () => {
+    mocks.playBlob.mockImplementationOnce((_blob, signal: AbortSignal) =>
+      new Promise((_, reject) => signal.addEventListener("abort", () => reject(new DOMException("Stopped", "AbortError")), { once: true }))
+    );
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    const firstTurn = s.turn();
+    await vi.waitFor(() => expect(mocks.playBlob).toHaveBeenCalledOnce());
+    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
+    onSpeechStart();
+    await firstTurn;
+    await s.turn("Make the hero a dragon");
+    const nextState = mocks.streamTurn.mock.calls[1][0];
+    expect(nextState.log.map((entry: { text: string }) => entry.text)).toEqual(["Make the hero a dragon"]);
+    expect(s.view.pages).toHaveLength(1);
+    s.close();
+  });
   it("ignores a turn response that arrives after interruption", async () => {
     let resolve!: (value: unknown) => void;
     mocks.streamTurn.mockImplementationOnce(() => new Promise(r => { resolve = r; }));
