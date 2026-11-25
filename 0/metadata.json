@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M88829JS0VB2TEVV5KC93TB1",
+  "session_id": "01a2101e-7211-7503-a60e-dd682dd01f01",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T02:20:29.811871Z",
+  "branch": "codex/first-christmas-story",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "README.md",
+    "components/Library.tsx",
+    "lib/stories/index.ts",
+    "lib/stories/standardArt.ts",
+    "public/story-art/first-christmas/beat-0.jpg",
+    "public/story-art/first-christmas/beat-1.jpg",
+    "public/story-art/first-christmas/beat-2.jpg",
+    "public/story-art/first-christmas/beat-3.jpg",
+    "public/story-art/first-christmas/beat-4.jpg",
+    "public/story-art/first-christmas/beat-5.jpg",
+    "scripts/story-art-scenes.json",
+    "tests/engine.test.ts"
+  ],
+  "agent": "Codex",
+  "model": "gpt-6-sol",
+  "turn_id": "34b695252855",
+  "checkpoint_transcript_start": 2441,
+  "transcript_lines_at_start": 2441,
+  "compact_transcript_start": 529,
+  "token_usage": {
+    "input_tokens": 5669,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 464128,
+    "output_tokens": 3677,
+    "api_call_count": 3
+  },
+  "session_token_usage": {
+    "input_tokens": 504841,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 37378048,
+    "output_tokens": 106643,
+    "api_call_count": 290
+  },
+  "redaction": {
+    "replacements": 24,
+    "layers": {
+      "betterleaks": 3,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 3,
+      "credentialed_uri": 0,
+      "entropy": 23,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 26
+  }
+}
