@@ -2,12 +2,16 @@ import { z } from "zod";
 import { buildImagePrompt, buildReferencePrompt } from "@/lib/engine/imagePrompt";
 import { falImage } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
+import { getClassicStory } from "@/lib/stories";
+import { standardArtUrl } from "@/lib/stories/standardArt";
+import { standardArtDataUri } from "@/lib/server/standardArt";
 
 const Body = z.object({
   scene: z.string().trim().min(1).max(800),
   artStyle: z.string().max(500),
   characters: z.array(z.object({ name: z.string().max(60), look: z.string().max(400) })).max(12),
   references: z.array(z.object({ url: z.string().url(), characters: z.array(z.string().max(60)).max(12) })).max(4).optional(),
+  standardArt: z.object({ storyId: z.string().max(80), beatIndex: z.number().int().min(0).max(50) }).optional(),
 });
 
 const FAL_MEDIA_HOST = /(^|\.)fal\.media$/;
@@ -29,6 +33,17 @@ export async function POST(req: Request) {
 
     let url: string | undefined;
     const references = (parsed.data.references ?? []).filter(reference => FAL_MEDIA_HOST.test(new URL(reference.url).hostname));
+    const standard = parsed.data.standardArt;
+    const story = standard && getClassicStory(standard.storyId);
+    const standardUrl = story && standardArtUrl(story, standard!.beatIndex);
+    if (standardUrl) {
+      try {
+        references.splice(0, references.length,
+          { url: await standardArtDataUri(standardUrl), characters: [] }, ...references.slice(-3));
+      } catch (e) {
+        console.warn("Standard illustration reference unavailable:", e);
+      }
+    }
     if (references.length > 1) {
       try {
         url = await falImage(

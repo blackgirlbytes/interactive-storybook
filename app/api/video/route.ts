@@ -2,8 +2,10 @@ import { z } from "zod";
 import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
 import { falQueueResult, falQueueStatus, falQueueSubmit, VIDEO_MODEL } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
+import { isStandardArtUrl } from "@/lib/stories/standardArt";
+import { standardArtDataUri } from "@/lib/server/standardArt";
 
-const Body = z.object({ imageUrl: z.string().url(), scene: z.string().trim().min(1).max(800), motion: z.string().trim().max(300).optional() });
+const Body = z.object({ imageUrl: z.string().min(1).max(2000), scene: z.string().trim().min(1).max(800), motion: z.string().trim().max(300).optional() });
 const FAL_MEDIA_HOST = /(^|\.)fal\.media$/;
 const REQUEST_ID = /^[0-9a-f-]{36}$/i;
 
@@ -11,15 +13,24 @@ export async function POST(req: Request) {
   try {
     if (!VIDEO_MODEL) return Response.json({ disabled: true });
     const parsed = Body.safeParse(await req.json().catch(() => null));
-    if (!parsed.success || !FAL_MEDIA_HOST.test(new URL(parsed.data.imageUrl).hostname)) {
+    if (!parsed.success) {
       return Response.json({ error: "Invalid video request" }, { status: 400 });
     }
     const { imageUrl, scene, motion } = parsed.data;
+    const canonical = isStandardArtUrl(imageUrl);
+    let falMedia = false;
+    try {
+      const remote = new URL(imageUrl);
+      falMedia = remote.protocol === "https:" && FAL_MEDIA_HOST.test(remote.hostname);
+    } catch { /* A local path must match the shipped art list. */ }
+    if (!canonical && !falMedia) return Response.json({ error: "Invalid video request" }, { status: 400 });
+    const modelImage = canonical ? await standardArtDataUri(imageUrl) : imageUrl;
     const id = await falQueueSubmit(VIDEO_MODEL, {
       prompt: buildVideoPrompt(scene, motion),
-      image_url: imageUrl,
+      image_url: modelImage,
       // Matching first and last frames makes the clip loop without a visible jump.
-      end_image_url: imageUrl,
+      end_image_url: modelImage,
+      ...(canonical ? { seed: [...imageUrl].reduce((seed, char) => (seed * 31 + char.charCodeAt(0)) >>> 0, 7) } : {}),
       duration: 5,
       resolution: "768P",
       prompt_expansion_mode: "disabled",

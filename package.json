@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "art:generate": "node --env-file=.env.local scripts/generate-story-art.cjs"
   },
   "dependencies": {
     "idb": "^8.0.4",

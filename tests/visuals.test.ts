@@ -76,7 +76,7 @@ describe("story visuals", () => {
     ];
     let image = 0;
     mocks.streamTurn.mockImplementation(async () => ({
-      segments: [{ speaker: "narrator", text: "The race continues." }], stateChanges: {}, advanceBeat: false,
+      segments: [{ speaker: "narrator", text: "The race continues." }], stateChanges: { plotNotes: ["The child changed the race"] }, advanceBeat: false,
       awaitChild: true, isEnding: false, ...scenes.shift(),
     }));
     mocks.speechAudio.mockImplementation(() => ({ blob: Promise.resolve(new Blob(["audio"])), play: async () => {} }));

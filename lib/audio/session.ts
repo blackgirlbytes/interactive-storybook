@@ -7,6 +7,7 @@ import { storyLanguage } from "@/lib/languages";
 import { WordClock } from "@/lib/text/wordClock";
 import type { AdventurePage } from "@/lib/db";
 import { isLikelyEcho } from "@/lib/engine/echo";
+import { standardArtUrl } from "@/lib/stories/standardArt";
 import { charactersInScene, type ImageReference } from "@/lib/engine/imagePrompt";
 
 export interface SessionView {
@@ -47,6 +48,7 @@ export class StorySession {
   private generation = 0;
   private timer?: ReturnType<typeof setTimeout>;
   private referenceUrl?: string;
+  private customized = false;
   private characterReferences = new Map<string, { url: string; page: AdventurePage }>();
   private imageJobs = new Set<Promise<void>>();
   private imageControllers = new Set<AbortController>();
@@ -164,6 +166,7 @@ export class StorySession {
       const previous = this.view.pages[this.view.pages.indexOf(active.page) - 1];
       active.page.image = previous?.image;
       active.page.video = previous?.video;
+      active.page.standardArtUrl = previous?.standardArtUrl;
     } else {
       this.view.pages = this.view.pages.filter(page => page !== active.page);
     }
@@ -309,7 +312,13 @@ export class StorySession {
       if (!current()) return;
       display(turn);
       page.scene = turn.imagePrompt ?? undefined;
-      if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt, turn.motionPrompt ?? undefined);
+      const standardUrl = standardArtUrl(base.story, base.beatIndex);
+      this.customized ||= !!text && (!!turn.stateChanges.plotNotes?.length ||
+        !!turn.stateChanges.addObjects?.length || !!turn.stateChanges.addCharacters?.length);
+      const changedStory = this.customized || base.plotNotes.length > 0 || !!turn.stateChanges.plotNotes?.length ||
+        !!turn.stateChanges.addCharacters?.length || base.characters.some(character => character.invented);
+      if (standardUrl && !changedStory) this.illustrateStandard(page, standardUrl, turn.imagePrompt ?? base.story.beats[base.beatIndex].goal, turn.motionPrompt ?? undefined);
+      else if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt, turn.motionPrompt ?? undefined, base.beatIndex);
       schedule();
       // Generate one page ahead while the current narration is playing.
       this.warmup();
@@ -344,7 +353,36 @@ export class StorySession {
     }
     return selected;
   }
-  private illustrate(page: AdventurePage, scene: string, motion?: string) {
+  private illustrateStandard(page: AdventurePage, url: string, scene: string, motion?: string) {
+    const previous = this.view.pages.at(-2);
+    if (previous?.standardArtUrl === url && previous.image && !this.abandonedPages.has(previous)) {
+      page.image = previous.image;
+      page.video = previous.video;
+      page.standardArtUrl = url;
+      this.emit();
+      return;
+    }
+    const controller = new AbortController();
+    page.image = undefined;
+    page.video = undefined;
+    page.standardArtUrl = url;
+    this.imageControllers.add(controller);
+    this.view.imageBusy = true; this.emit();
+    const job = (async () => {
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Could not open the standard illustration (${response.status})`);
+        const image = await response.blob();
+        if (this.closed || this.abandonedPages.has(page)) return;
+        page.image = image;
+        this.emit();
+        this.animate(image, url, scene, motion);
+      } catch (e) { if (!this.closed && (e as Error).name !== "AbortError") this.view.error = `Illustration: ${(e as Error).message}`; }
+    })();
+    this.imageJobs.add(job);
+    void job.finally(() => { this.imageJobs.delete(job); this.imageControllers.delete(controller); this.view.imageBusy = this.imageJobs.size > 0; this.emit(); });
+  }
+  private illustrate(page: AdventurePage, scene: string, motion?: string, beatIndex?: number) {
     const controller = new AbortController();
     this.imageControllers.add(controller);
     this.view.imageBusy = true; this.emit();
@@ -352,12 +390,17 @@ export class StorySession {
     const visibleCharacters = charactersInScene(scene, this.view.state.characters);
     const job = (async () => {
       try {
-        const data = await post<{ url: string; dataUri: string }>("/api/image", { scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, references }, controller.signal);
+        const data = await post<{ url: string; dataUri: string }>("/api/image", {
+          scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, references,
+          standardArt: beatIndex !== undefined && standardArtUrl(this.view.state.story, beatIndex)
+            ? { storyId: this.view.state.story.id, beatIndex } : undefined,
+        }, controller.signal);
         if (this.closed || this.abandonedPages.has(page)) return;
         const image = await (await fetch(data.dataUri)).blob();
         if (this.closed || this.abandonedPages.has(page)) return;
         page.image = image;
         page.video = undefined;
+        page.standardArtUrl = undefined;
         for (const name of visibleCharacters) {
           const existing = this.characterReferences.get(name);
           if (!existing || this.abandonedPages.has(existing.page)) this.characterReferences.set(name, { url: data.url, page });

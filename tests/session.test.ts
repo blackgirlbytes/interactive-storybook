@@ -200,7 +200,7 @@ describe("session lifecycle", () => {
     mocks.post.mockResolvedValue({ url: "https://v3.fal.media/files/scene.jpg", dataUri: "data:image/jpeg;base64,aW1hZ2U=" });
     let finish!: (blob: Blob) => void;
     mocks.animateScene.mockImplementation(() => new Promise(r => { finish = r; }));
-    mocks.streamTurn.mockImplementationOnce(async (_state, _signal, onSegment) => { reply.segments.forEach(onSegment); return { ...reply, imagePrompt: "Hare naps under a tree" }; });
+    mocks.streamTurn.mockImplementationOnce(async (_state, _signal, onSegment) => { reply.segments.forEach(onSegment); return { ...reply, stateChanges: { plotNotes: ["Hare naps in a new place"] }, imagePrompt: "Hare naps under a tree" }; });
     const s = new StorySession(story, () => {});
     await s.turn();
     await vi.waitFor(() => expect(mocks.animateScene).toHaveBeenCalledOnce());
