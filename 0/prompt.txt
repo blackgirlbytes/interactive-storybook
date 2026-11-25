@@ -1,0 +1,18 @@
+lets tackle these two
+
+[**Slop**](https://entire.com/gh/blackgirlbytes/-/agents/01M888J04GRYBY4NAF5EPZP03P)2m ago
+**`StorySession.startMicrophone`** no longer passes the fourth **`onSpeechStart`** argument. **`CreateStory`** never passed it, so the optional parameter and the **`StartOfTurn`** dispatch this Change added to **`Microphone.start`** are now dead code. Remove the parameter and the **`onSpeechStart?.()`** branch.
+[**Slop**](https://entire.com/gh/blackgirlbytes/-/agents/01M888J04GRYBY4NAF5EPZP03P)2h ago
+**`illustrateStandard`** calls **`animate()`** for the shipped, unchanging pictures, so every reading of an unchanged classic submits a new paid fal video job (about $0.09 per beat). The **`/api/video`** route even derives a fixed seed to make those clips repeatable. Since the stills are pre-generated once, ship or cache their loops the same way instead of paying for identical clips each session.
+
+---
+
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_1eeceef9fd7a47f9bce5b02f09c7d1f1\",0]","question":"fal rejected the first classic video job because the account balance is exhausted. Can you top up fal so I can generate and ship the 27 clips (roughly $2.43 at the review’s estimate), or would you prefer a different storage or animation approach?","answer":"I’ll top up fal; generate the clips"}]
+</send_user_message_question_reply>
+
+---
+
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_ecf655dea67b4993a180b8f8561b98f1\",0]","question":"The fal key still returns “Exhausted balance.” Please tell me when the top-up is complete so I can start generating the 27 clips.","answer":"Top-up is complete"}]
+</send_user_message_question_reply>
