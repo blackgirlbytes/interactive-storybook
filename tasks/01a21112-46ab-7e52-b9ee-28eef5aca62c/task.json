@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "01a21112-46ab-7e52-b9ee-28eef5aca62c",
+  "agent_id": "01a21112-46ab-7e52-b9ee-28eef5aca62c",
+  "subagent_type": "default",
+  "files": [
+    "lib/audio/session.ts",
+    "tests/session.test.ts"
+  ],
+  "token_usage": {
+    "input_tokens": 37389,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1370240,
+    "output_tokens": 7866,
+    "api_call_count": 25
+  },
+  "started_at": "2026-11-24T23:59:02.269016-05:00",
+  "completed_at": "2026-11-25T00:02:37.800545-05:00"
+}
