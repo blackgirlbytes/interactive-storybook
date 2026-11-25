@@ -1,0 +1,9 @@
+what do you think of the design of this storybook
+
+---
+
+its more like the color and style isnt great either imo
+
+---
+
+i think once upon tonight looks good but the SVGs youre doing are horrible. do better at these please. get as realistic as possible..use p5.js if you must
