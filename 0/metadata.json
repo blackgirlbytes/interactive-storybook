@@ -1,0 +1,58 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M88JX2CRA4K480MKAA04MMEF",
+  "session_id": "01a21111-fc19-7383-a8c8-d36bcb713386",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T05:29:52.759815Z",
+  "branch": "codex/storybook-updates-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "lib/audio/client.ts",
+    "tests/flux.test.ts"
+  ],
+  "agent": "Codex",
+  "model": "gpt-6-sol",
+  "turn_id": "c85597c758e5",
+  "checkpoint_transcript_start": 1071,
+  "transcript_lines_at_start": 1071,
+  "compact_transcript_start": 216,
+  "token_usage": {
+    "input_tokens": 29244,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2293376,
+    "output_tokens": 12240,
+    "api_call_count": 24
+  },
+  "session_token_usage": {
+    "input_tokens": 175251,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 10032896,
+    "output_tokens": 34892,
+    "api_call_count": 151,
+    "subagent_tokens": {
+      "input_tokens": 183358,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 7204736,
+      "output_tokens": 37133,
+      "api_call_count": 124
+    },
+    "subagent_tokens_complete": true
+  },
+  "redaction": {
+    "replacements": 1278,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 1593,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 3
+  }
+}
