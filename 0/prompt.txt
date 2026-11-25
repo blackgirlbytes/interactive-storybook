@@ -1,0 +1,5 @@
+what do you think if we add some soft background music to the narration..is that possible with deepgram or fal
+
+---
+
+the page switch is still not very smooth..how can we diagnose and fix it
