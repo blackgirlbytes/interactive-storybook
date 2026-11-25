@@ -94,6 +94,50 @@ describe("session lifecycle", () => {
     expect(mocks.streamTurn).toHaveBeenCalledTimes(3);
     s.close();
   });
+  it("moves on after eight seconds when nobody answers in Play & talk", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    await s.turn();
+    expect(s.view.status).toBe("What happens next? Tell me!");
+    await vi.advanceTimersByTimeAsync(7999);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
+    expect(s.view.pages).toHaveLength(2);
+    s.close();
+  });
+  it("keeps waiting when speech begins and uses the child's answer", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    await s.turn();
+    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
+    onSpeechStart();
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(1);
+    const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
+    onFinal("The tortoise finds a bicycle");
+    await vi.waitFor(() => expect(mocks.streamTurn).toHaveBeenCalledTimes(2));
+    expect(mocks.streamTurn.mock.calls[1][0].log.at(-1).text).toBe("The tortoise finds a bicycle");
+    s.close();
+  });
+  it("cancels the unanswered question timer when paused", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    await s.turn();
+    s.pauseNarrator();
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(1);
+    s.close();
+  });
+  it("uses the shorter automatic wait when switching from Play & talk to Listen", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    await s.turn();
+    await s.mode("listen");
+    await vi.advanceTimersByTimeAsync(1200);
+    expect(s.view.pages).toHaveLength(2);
+    s.close();
+  });
   it("replays an interrupted page instead of silently skipping it", async () => {
     mocks.playBlob.mockImplementationOnce((_blob,signal: AbortSignal) => new Promise((_,reject) => { signal.addEventListener("abort",()=>reject(new DOMException("Stopped","AbortError"))); }));
     const s = new StorySession(story,()=>{});

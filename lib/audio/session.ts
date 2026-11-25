@@ -10,6 +10,8 @@ import { isLikelyEcho } from "@/lib/engine/echo";
 import { standardArtUrl } from "@/lib/stories/standardArt";
 import { charactersInScene, type ImageReference } from "@/lib/engine/imagePrompt";
 
+const CHILD_REPLY_WAIT_MS = 8000;
+
 export interface SessionView {
   state: StoryState;
   pages: AdventurePage[];
@@ -47,6 +49,7 @@ export class StorySession {
   private mic?: Microphone;
   private generation = 0;
   private timer?: ReturnType<typeof setTimeout>;
+  private awaitingChild = false;
   private referenceUrl?: string;
   private customized = false;
   private characterReferences = new Map<string, { url: string; page: AdventurePage }>();
@@ -97,7 +100,7 @@ export class StorySession {
     void prepared.done.catch(() => {});
     return prepared;
   }
-  stopTurn() { clearTimeout(this.timer); this.generation++; this.controller?.abort(); }
+  stopTurn() { clearTimeout(this.timer); this.awaitingChild = false; this.generation++; this.controller?.abort(); }
   private stopNarration() { this.paused = true; this.stopTurn(); this.discardPrefetch(); }
   pauseNarrator() {
     this.stopNarration();
@@ -178,6 +181,11 @@ export class StorySession {
   }
   async mode(mode: Mode) {
     if (this.lastWords) await this.lastWords;
+    const wasAwaitingChild = this.awaitingChild;
+    if (wasAwaitingChild) {
+      clearTimeout(this.timer);
+      this.awaitingChild = false;
+    }
     this.discardPrefetch();
     this.mic?.stop(); this.mic = undefined;
     this.view.state = { ...this.view.state, mode }; this.view.listening = false;
@@ -186,6 +194,9 @@ export class StorySession {
       this.view.status = "Narrator paused";
     }
     this.emit();
+    if (wasAwaitingChild && mode === "listen" && !this.view.state.ended) {
+      this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
+    }
     if (mode === "play") {
       const mic = this.mic = new Microphone(storyLanguage(this.view.state.story));
       try {
@@ -200,6 +211,9 @@ export class StorySession {
           if (this.view.pauseMode !== "none") {
             this.view.pauseMode = "narrator";
             this.view.status = "Narrator paused. You can speak.";
+          } else if (wasAwaitingChild) {
+            this.awaitingChild = true;
+            this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, CHILD_REPLY_WAIT_MS);
           }
         }
       } catch (e) { this.view.error = String((e as Error).message); }
@@ -327,8 +341,9 @@ export class StorySession {
       this.pendingPage = undefined;
       this.activeNarration = undefined;
       this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : turn.awaitChild ? "What happens next? Tell me!" : "A little more magic…"; this.emit();
-      if (!this.view.state.ended && !(turn.awaitChild && this.view.state.mode === "play")) {
-        this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
+      if (!this.view.state.ended) {
+        this.awaitingChild = turn.awaitChild && this.view.state.mode === "play";
+        this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, this.awaitingChild ? CHILD_REPLY_WAIT_MS : 1200);
       }
     } catch (e) {
       if (current() && (e as Error).name !== "AbortError") { controller.abort(); this.discardPrefetch(); this.view.error = (e as Error).message; this.view.status = "Let’s try that again"; this.emit(); }

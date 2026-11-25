@@ -16,7 +16,7 @@ Open http://localhost:3000. The library works without keys; generated stories, i
 ## Try it
 
 - Open one of four classics, then **Begin the story**. Listen mode continues automatically.
-- Choose **Play & talk**, allow microphone access, and interrupt with “The tortoise has roller skates!” or “Noah, why did you build the ark?” Headphones prevent speaker audio from reaching the microphone. Typed ideas work too.
+- Choose **Play & talk**, allow microphone access, and interrupt with “The tortoise has roller skates!” or “Noah, why did you build the ark?” When the story asks a question, it waits up to 8 seconds for a reply, then continues if nobody speaks. Speech stops that timer so a child can finish their idea. Headphones prevent speaker audio from reaching the microphone. Typed ideas work too.
 - **Create a story** guides the child through a hero, setting, problem, and helper, then opens their new story.
 - **Save this version** makes a separate copy in IndexedDB, including text and image/video/audio blobs. Clips still rendering when you save are not included. Saving pauses playback, turns off the microphone, and finishes downloading missing narration. Originals stay unchanged.
 - **My adventures** replays saved versions without AI calls. There are no accounts or cloud saves. Saves stay in the same browser/profile/origin, subject to storage quota and browser eviction. Clearing site data deletes them. Private browsing may not preserve them.
