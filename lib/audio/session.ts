@@ -50,6 +50,8 @@ export class StorySession {
   private recentlySpoken = "";
   private spokenAt = 0;
   private snapshotting = false;
+  /** Set while a closing microphone is still handing over the child's last words. */
+  private lastWords?: Promise<void>;
   private prefetched?: PreparedTurn;
   constructor(story: StoryDef, private update: (view: SessionView) => void, restored?: SessionView) {
     this.view = restored ? { ...restored, listening: false, pauseMode: "none", imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, pauseMode: "none", imageBusy: false, videoBusy: false };
@@ -94,13 +96,26 @@ export class StorySession {
   }
   pauseAll() {
     this.stopNarration();
-    this.mic?.stop(); this.mic = undefined;
+    const mic = this.mic; this.mic = undefined;
+    if (mic) {
+      const words: Promise<void> = this.keepLastWords(mic).finally(() => { if (this.lastWords === words) this.lastWords = undefined; });
+      this.lastWords = words;
+    }
     this.view.listening = false;
     this.view.pauseMode = "all";
     this.view.status = "Story and microphone paused";
     this.emit();
   }
+  /** Turns the mic off, keeping a half-finished idea as story input for when the story resumes. */
+  private async keepLastWords(mic: Microphone) {
+    const text = await mic.finish().catch(() => "");
+    if (!text || this.closed || this.echo(text)) return;
+    this.rememberHeardNarration();
+    this.view.state = { ...addChildUtterance(this.view.state, text), ended: false };
+    this.emit();
+  }
   async resume() {
+    if (this.lastWords) await this.lastWords;
     if (this.view.pauseMode === "all" && this.view.state.mode === "play") {
       await this.mode("play");
       if (!this.view.listening) return;
@@ -145,6 +160,7 @@ export class StorySession {
     this.emit();
   }
   async mode(mode: Mode) {
+    if (this.lastWords) await this.lastWords;
     this.discardPrefetch();
     this.mic?.stop(); this.mic = undefined;
     this.view.state = { ...this.view.state, mode }; this.view.listening = false;
@@ -336,6 +352,8 @@ export class StorySession {
     this.snapshotting = true;
     this.pauseAll();
     try {
+      // Keep an idea the child was mid-way through saying when Save was pressed.
+      if (this.lastWords) await this.lastWords;
       await Promise.all([...this.imageJobs]);
       // Interrupted pages still need complete audio for offline replay.
       for (const page of this.view.pages) {

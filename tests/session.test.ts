@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLASSIC_STORIES } from "@/lib/stories";
-const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn(), micStart:vi.fn(), micStop:vi.fn() }));
-vi.mock("@/lib/audio/client", () => ({ ...mocks, Microphone: class { start = mocks.micStart; stop = mocks.micStop; } }));
+const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn(), micStart:vi.fn(), micStop:vi.fn(), micFinish:vi.fn() }));
+vi.mock("@/lib/audio/client", () => ({ ...mocks, Microphone: class { start = mocks.micStart; stop = mocks.micStop; finish = mocks.micFinish; } }));
 import { StorySession } from "@/lib/audio/session";
 const story = CLASSIC_STORIES[2];
 const reply = { segments:[{speaker:"narrator",text:"Once upon a time."}],stateChanges:{},advanceBeat:false,awaitChild:true,isEnding:false };
@@ -11,6 +11,7 @@ beforeEach(() => {
   mocks.speech.mockResolvedValue(new Blob(["audio"]));
   mocks.playBlob.mockResolvedValue(undefined);
   mocks.micStart.mockResolvedValue(undefined);
+  mocks.micFinish.mockImplementation(async () => { mocks.micStop(); return ""; });
   mocks.speechAudio.mockImplementation((text, voice, signal) => {
     const blob = mocks.speech(text, voice, signal);
     void blob.catch(() => {});
@@ -132,6 +133,27 @@ describe("session lifecycle", () => {
     expect(s.view.listening).toBe(true);
     expect(s.view.pauseMode).toBe("none");
     expect(mocks.streamTurn).toHaveBeenCalledOnce();
+    s.close();
+  });
+  it("keeps what the child was saying when everything is paused", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    mocks.micFinish.mockResolvedValueOnce("The tortoise has roller skates");
+    s.pauseAll();
+    expect(mocks.streamTurn).not.toHaveBeenCalled();
+    await s.resume();
+    expect(mocks.streamTurn).toHaveBeenCalledOnce();
+    const sentState = mocks.streamTurn.mock.calls[0][0];
+    expect(sentState.log.at(-1)).toMatchObject({ kind: "child", text: "The tortoise has roller skates" });
+    s.close();
+  });
+  it("saves what the child was saying when Save is pressed", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    mocks.micFinish.mockResolvedValueOnce("Add a purple dragon");
+    const snapshot = await s.snapshot();
+    expect(snapshot.state.log.at(-1)).toMatchObject({ kind: "child", text: "Add a purple dragon" });
+    expect(mocks.streamTurn).not.toHaveBeenCalled();
     s.close();
   });
   it("completes missing audio for saved interrupted pages", async () => {

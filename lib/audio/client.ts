@@ -157,6 +157,12 @@ export class Microphone {
   private socket?: WebSocket;
   private recorder?: MediaRecorder;
   private stopped = false;
+  /** True between Flux's StartOfTurn and EndOfTurn: the child is mid-idea. */
+  private inTurn = false;
+  /** The latest words heard in the turn in progress. */
+  private turnText = "";
+  /** Set while finish() waits for Flux to send the final words of the turn. */
+  private ending?: (text: string) => void;
 
   async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void, onSpeechStart?: () => void) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone needs HTTPS or localhost and a supported browser.");
@@ -180,20 +186,68 @@ export class Microphone {
       if (this.stopped) { this.stop(); return; }
       socket.onmessage = (event) => {
         const msg = JSON.parse(event.data) as { type?: string; event?: string; transcript?: string; description?: string };
-        if (msg.type === "Error" || msg.type === "FatalError") { this.stop(); onError(`Microphone error: ${msg.description ?? "Deepgram stopped listening."}`); return; }
+        if (msg.type === "Error" || msg.type === "FatalError") {
+          if (this.ending) { this.ending(this.turnText); return; }
+          this.stop(); onError(`Microphone error: ${msg.description ?? "Deepgram stopped listening."}`); return;
+        }
+        // FORCE_END_TURN_NO_ACTIVE_TURN: the turn already ended, so there is nothing more to wait for.
+        if (msg.type === "Warning") { this.ending?.(this.turnText); return; }
         if (msg.type !== "TurnInfo") return;
         const text = msg.transcript?.trim() ?? "";
+        if (msg.event === "EndOfTurn") {
+          this.inTurn = false; this.turnText = "";
+          if (this.ending) this.ending(text);
+          else if (text) onFinal(text);
+          return;
+        }
+        this.inTurn = true;
+        if (text) this.turnText = text;
+        if (this.ending) return;
         if (msg.event === "StartOfTurn") onSpeechStart?.();
-        if (msg.event === "EndOfTurn") { if (text) onFinal(text); }
-        else if (text) onInterim(text);
+        if (text) onInterim(text);
       };
-      socket.onclose = () => { if (!this.stopped) { this.stop(); onError("The microphone disconnected. Turn Play mode on again to reconnect."); } };
+      socket.onclose = () => {
+        if (this.ending) { this.ending(this.turnText); return; }
+        if (!this.stopped) { this.stop(); onError("The microphone disconnected. Turn Play mode on again to reconnect."); } };
       socket.onerror = () => onError("Microphone connection error.");
       this.recorder = new MediaRecorder(this.stream, { mimeType });
       this.recorder.ondataavailable = e => { if (e.data.size && socket.readyState === WebSocket.OPEN) socket.send(e.data); };
       // Deepgram recommends roughly 80 ms of audio per message for Flux.
       this.recorder.start(80);
     } catch (err) { this.stop(); throw err; }
+  }
+
+  /**
+   * Turns the microphone off without losing a half-finished idea. If the child is mid-turn,
+   * sends the last audio, asks Flux to end the turn now (ForceEndTurn), and waits briefly for
+   * the final transcript. CloseStream alone never ends the turn, so those words would be lost.
+   * Resolves with the child's final words, or "" if they weren't speaking.
+   */
+  async finish(timeoutMs = 2000): Promise<string> {
+    const socket = this.socket;
+    if (this.stopped || !socket || socket.readyState !== WebSocket.OPEN) { this.stop(); return ""; }
+    this.stopped = true;
+    const recorder = this.recorder;
+    if (recorder?.state === "recording") {
+      // The recorder hands over its last chunk just before it fires "stop".
+      await new Promise<void>(resolve => {
+        const timer = setTimeout(resolve, 500);
+        recorder.onstop = () => { clearTimeout(timer); resolve(); };
+        recorder.stop();
+      });
+    }
+    this.stream?.getTracks().forEach(t => t.stop());
+    let text = "";
+    if (this.inTurn && socket.readyState === WebSocket.OPEN) {
+      text = await new Promise<string>(resolve => {
+        const timer = setTimeout(() => done(this.turnText), timeoutMs);
+        const done = (words: string) => { clearTimeout(timer); this.ending = undefined; resolve(words); };
+        this.ending = done;
+        socket.send(JSON.stringify({ type: "ForceEndTurn" }));
+      });
+    }
+    this.stop();
+    return text.trim();
   }
 
   stop() {
