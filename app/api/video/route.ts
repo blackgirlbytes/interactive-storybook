@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
+import { buildVideoInput } from "@/lib/engine/videoPrompt";
 import { falQueueResult, falQueueStatus, falQueueSubmit, VIDEO_MODEL } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
 
@@ -21,16 +21,7 @@ export async function POST(req: Request) {
       falMedia = remote.protocol === "https:" && FAL_MEDIA_HOST.test(remote.hostname);
     } catch { /* Only generated fal images can be submitted for video. */ }
     if (!falMedia) return Response.json({ error: "Invalid video request" }, { status: 400 });
-    const id = await falQueueSubmit(VIDEO_MODEL, {
-      prompt: buildVideoPrompt(scene, motion),
-      image_url: imageUrl,
-      // Matching first and last frames makes the clip loop without a visible jump.
-      end_image_url: imageUrl,
-      duration: 5,
-      resolution: "768P",
-      prompt_expansion_mode: "disabled",
-      enable_safety_checker: true,
-    }, req.signal);
+    const id = await falQueueSubmit(VIDEO_MODEL, buildVideoInput(imageUrl, scene, motion), req.signal);
     return Response.json({ id });
   } catch (err) {
     return errorResponse(err);

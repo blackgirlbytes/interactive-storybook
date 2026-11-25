@@ -32,7 +32,7 @@ async function queue(url, init) {
   return response.json();
 }
 
-async function generate(story, index, buildVideoPrompt, force) {
+async function generate(story, index, buildVideoInput, force) {
   const scene = scenes[story.id]?.[index];
   if (!scene) throw new Error(`Missing scene for ${story.id} beat ${index}`);
   const file = path.join(scriptDir, "../public/story-video", story.id, `beat-${index}.mp4`);
@@ -41,23 +41,16 @@ async function generate(story, index, buildVideoPrompt, force) {
     return;
   }
   const pendingFile = `${file}.pending.json`;
-  let id;
-  if (!force) id = await fs.readFile(pendingFile, "utf8").then(text => JSON.parse(text).id, () => undefined);
+  const pending = force ? undefined : await fs.readFile(pendingFile, "utf8").then(text => JSON.parse(text), () => undefined);
+  if (pending && pending.model !== model) throw new Error(`${story.id} beat ${index} was submitted with ${pending.model}; restore FAL_VIDEO_MODEL before resuming.`);
+  let id = pending?.id;
   if (!id) {
     const image = await fs.readFile(path.join(scriptDir, "../public/story-art", story.id, `beat-${index}.jpg`));
     const imageUrl = `data:image/jpeg;base64,${image.toString("base64")}`;
     const submitted = await queue(`${queueBase}/${model}`, {
       method: "POST",
-      body: JSON.stringify({
-        prompt: buildVideoPrompt(scene),
-        image_url: imageUrl,
-        end_image_url: imageUrl,
-        seed: [...`${story.id}/${index}`].reduce((seed, char) => (seed * 31 + char.charCodeAt(0)) >>> 0, 7),
-        duration: 5,
-        resolution: "768P",
-        prompt_expansion_mode: "disabled",
-        enable_safety_checker: true,
-      }),
+      body: JSON.stringify(buildVideoInput(imageUrl, scene, undefined,
+        [...`${story.id}/${index}`].reduce((seed, char) => (seed * 31 + char.charCodeAt(0)) >>> 0, 7))),
     });
     id = submitted.request_id;
     if (!id) throw new Error(`No request ID for ${story.id} beat ${index}`);
@@ -105,7 +98,7 @@ async function main() {
   const onlyStory = process.argv.find(arg => arg.startsWith("--story="))?.split("=")[1];
   const onlyBeat = process.argv.find(arg => arg.startsWith("--beat="))?.split("=")[1];
   const { CLASSIC_STORIES } = await loadModule(path.join(scriptDir, "../lib/stories/index.ts"), () => ({ voiceModel: name => name }));
-  const { buildVideoPrompt } = await loadModule(path.join(scriptDir, "../lib/engine/videoPrompt.ts"));
+  const { buildVideoInput } = await loadModule(path.join(scriptDir, "../lib/engine/videoPrompt.ts"));
   const tasks = [];
   for (const story of CLASSIC_STORIES) {
     if (onlyStory && story.id !== onlyStory) continue;
@@ -120,7 +113,7 @@ async function main() {
     for (;;) {
       const task = tasks.shift();
       if (!task) return;
-      await generate(task.story, task.index, buildVideoPrompt, force);
+      await generate(task.story, task.index, buildVideoInput, force);
     }
   });
   const results = await Promise.allSettled(workers);

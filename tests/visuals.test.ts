@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CLASSIC_STORIES } from "@/lib/stories";
 import { buildImagePrompt, buildReferencePrompt, charactersInScene } from "@/lib/engine/imagePrompt";
-import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
+import { buildVideoInput, buildVideoPrompt } from "@/lib/engine/videoPrompt";
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), streamTurn: vi.fn(), speechAudio: vi.fn(), animateScene: vi.fn(), audioDuration: vi.fn(), falImage: vi.fn(), falQueueSubmit: vi.fn() }));
 vi.mock("@/lib/audio/client", () => ({
@@ -37,6 +37,11 @@ describe("story visuals", () => {
     expect(prompt).toContain("Tilly takes two small steps");
     expect(prompt).toContain("Only move elements already in the picture");
     expect(prompt).toContain("Keep the camera still");
+    expect(buildVideoInput("https://v3.fal.media/scene.jpg", "Tilly stands beneath the oak tree", "Tilly takes two small steps")).toMatchObject({
+      image_url: "https://v3.fal.media/scene.jpg", end_image_url: "https://v3.fal.media/scene.jpg",
+      duration: 5, resolution: "768P", prompt_expansion_mode: "disabled",
+    });
+    expect(buildVideoInput("data:image/jpeg;base64,aW1hZ2U=", "Tilly stands beneath the oak tree", undefined, 123).seed).toBe(123);
   });
 
   it("uses multiple character references for a new illustration", async () => {

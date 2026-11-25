@@ -7,3 +7,18 @@ export function buildVideoPrompt(scene: string, motion?: string): string {
     "Keep the camera still and preserve the exact character designs, colors, art style and composition. " +
     "Return to the starting pose for a smooth loop. No new characters, dialogue, text or scene cuts.";
 }
+
+/** Shared fal request settings for both live scenes and pre-generated classic loops. */
+export function buildVideoInput(imageUrl: string, scene: string, motion?: string, seed?: number) {
+  return {
+    prompt: buildVideoPrompt(scene, motion),
+    image_url: imageUrl,
+    // Matching first and last frames makes the clip loop without a visible jump.
+    end_image_url: imageUrl,
+    ...(seed === undefined ? {} : { seed }),
+    duration: 5,
+    resolution: "768P",
+    prompt_expansion_mode: "disabled",
+    enable_safety_checker: true,
+  };
+}
