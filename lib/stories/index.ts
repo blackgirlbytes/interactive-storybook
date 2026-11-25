@@ -2,7 +2,7 @@ import type { StoryDef } from "@/lib/types";
 import { voiceModel as v } from "@/lib/voices";
 
 export const ART_STYLE =
-  "Warm watercolor children's picture book illustration, soft pastel colors, gentle golden lighting, friendly rounded characters with big expressive eyes, cozy and whimsical, no text or letters";
+  "Rich gouache and ink children's picture book illustration set at twilight and under moonlight: deep indigo and blue shadows, warm lamplight-gold glows from lanterns, windows and fireflies, soft silvery rim light on the characters, fine hand-drawn ink outlines, textured paper grain, friendly expressive characters, cozy and magical, never scary, no text or letters";
 
 export const CLASSIC_STORIES: StoryDef[] = [
   {

@@ -56,13 +56,13 @@ async function main() {
       const looks = story.characters.filter(character => character.name.toLowerCase().split(/\W+/)
         .some(word => word.length > 2 && !["the", "little", "pig", "riding", "hood"].includes(word) && scene.toLowerCase().includes(word)))
         .map(character => `${character.name}: ${character.look}`).join("; ");
-      const prompt = `${story.artStyle}. A single wide 4:3 storybook page, no panels. Show exactly this scene: ${scene} Character designs for the people or animals named above: ${looks}. Do not show other characters or events from the story. No words, letters, captions, signs, watermarks or signatures.`;
+      const prompt = `${story.artStyle}. A single wide 4:3 storybook page, full-bleed edge to edge with no border, frame or panels. Show exactly this scene: ${scene} Character designs for the people or animals named above: ${looks}. Do not show other characters or events from the story. No words, letters, captions, signs, watermarks or signatures.`;
       // An edit reference can carry an unwanted character into the next scene.
       const independent = forceIndependent || (story.id === "three-little-pigs" && index === 4) ||
         (story.id === "little-red-riding-hood" && (index === 2 || index === 3 || index === 4));
       const bytes = reference && !independent
         ? await generate("fal-ai/flux-2/edit", {
-            prompt: `Use the reference only for character appearance and watercolor style. Compose a new picture from scratch. Exactly one of each named character: ${prompt}`,
+            prompt: `Use the reference only for character appearance and the painted night style. Compose a new picture from scratch. Exactly one of each named character: ${prompt}`,
             image_urls: [reference], image_size: "landscape_4_3", enable_prompt_expansion: false,
             enable_safety_checker: true, output_format: "jpeg", seed: 44000 + index,
           })
