@@ -10,13 +10,13 @@
 import type p5 from "p5";
 import { ART_H, ART_W, ARK_PORTHOLES, SPRITES, paintBackdrop, paintSprite, paintVignette, type Layout, type Pt } from "./paint";
 
-export type ScenePlayer = p5 & { relayout: () => void };
+export type ScenePlayer = p5 & { relayout: () => void; setReveal: (on: boolean) => void };
 type Ctx = CanvasRenderingContext2D;
 type Actor = { draw: (t: number, dt: number) => void };
 
 const smooth = (a: number, b: number, x: number) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
 
-export function sceneSketch(kind: string, host: HTMLElement, reduced: boolean) {
+export function sceneSketch(kind: string, host: HTMLElement, reduced: boolean, initialReveal = true) {
   return (sk: p5) => {
     const p = sk as ScenePlayer;
     let bg: p5.Graphics | undefined, vig: p5.Graphics | undefined, sprite: p5.Graphics | undefined;
@@ -250,24 +250,45 @@ export function sceneSketch(kind: string, host: HTMLElement, reduced: boolean) {
     }
 
     const watch = { x: 220 };
+    const reveal = { on: initialReveal };
 
     function skatingTortoise(baseY: (x: number) => number, sc: number): Actor {
-      let wheel = 0, prev = 225;
+      let wheel = 0, prev = 170, walkX = 150, from = 150, skateStart = -1;
       const puffs: { x: number; y: number; r: number; life: number }[] = [];
+      const sparks: { x: number; y: number; vx: number; vy: number; life: number; hue: number }[] = [];
       return {
         draw(t, dt) {
-          const u = t * 0.16 + p.noise(5, t * 0.05) * 0.8;
-          const x = 190 + Math.sin(u * Math.PI * 2) * 66;
+          // Until the child's "what if" is heard, the tortoise plods along on foot.
+          // Then the skates pop on and it rolls off, easing into its loop.
+          if (reveal.on && skateStart < 0) {
+            skateStart = t; from = walkX;
+            for (let i = 0; i < 18; i++) {
+              const a = rand(0, Math.PI * 2), v = rand(0.6, 1.8);
+              sparks.push({ x: walkX, y: baseY(walkX) + 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.8, life: 0, hue: rand(38, 52) });
+            }
+          }
+          const skating = skateStart >= 0, ts = skating ? t - skateStart : 0;
+          let x: number;
+          if (!skating) { walkX += dt * 3.2; if (walkX > 210) walkX = 210; x = walkX; }
+          else {
+            const ramp = smooth(0, 2.2, ts);
+            const loop = 190 + Math.sin((ts * 0.16 + p.noise(5, t * 0.05) * 0.5 - 0.25) * Math.PI * 2) * 66;
+            x = from + (loop - from) * ramp;
+          }
           const vel = (x - prev) / Math.max(dt, 1e-3); prev = x; watch.x = x;
-          const dir = vel >= 0 ? 1 : -1, speed = Math.min(1, Math.abs(vel) / 70);
+          const dir = skating ? (vel >= 0 ? 1 : -1) : 1, speed = skating ? Math.min(1, Math.abs(vel) / 70) : 0;
           wheel += vel * dt / 3;
-          const stride = Math.abs(Math.sin(t * 4.2)) * speed;
-          const y = baseY(x) + 6 - stride * 1.6;
+          const popScale = skating ? 1 + Math.sin(Math.min(1, ts / 0.5) * Math.PI) * 0.35 : 0;
+          const stride = skating ? Math.abs(Math.sin(t * 4.2)) * speed : Math.abs(Math.sin(t * 3)) * 0.6;
+          const y = baseY(x) + 6 - stride * 1.2;
           if (speed > 0.4 && Math.random() < speed * 0.5) puffs.push({ x: x - dir * 22 * sc, y: baseY(x) + 5, r: rand(1, 2.5), life: 0 });
           for (const pf of puffs) { pf.life += dt; pf.r += dt * 6; pf.y -= dt * 3; }
           while (puffs.length && puffs[0].life > 0.9) puffs.shift();
+          for (const sp of sparks) { sp.life += dt; sp.x += sp.vx * dt * 60; sp.y += sp.vy * dt * 60; sp.vy += 0.05 * dt * 60; }
+          while (sparks.length && sparks[0].life > 1.1) sparks.shift();
           p.noStroke();
           for (const pf of puffs) { p.fill(225, 20, 70, 30 * (1 - pf.life / 0.9)); p.circle(pf.x, pf.y, pf.r * 2); }
+          for (const sp of sparks) { const k = 1 - sp.life / 1.1; p.fill(sp.hue, 70, 100, 90 * k); p.circle(sp.x, sp.y, 1.6 + k * 1.6); }
           if (speed > 0.55) {
             p.stroke(220, 25, 90, 35 * speed); p.strokeWeight(0.7);
             for (let k = 0; k < 3; k++) { const ly = y - 10 * sc - k * 8 * sc; p.line(x - dir * (40 + k * 6) * sc, ly, x - dir * (58 + k * 10) * sc, ly); }
@@ -278,20 +299,28 @@ export function sceneSketch(kind: string, host: HTMLElement, reduced: boolean) {
           const flap = Math.sin(t * 9) * 2 * (0.3 + speed);
           p.fill(4, 72, 66); ink(0.9);
           p.beginShape(); p.vertex(24, -18); p.bezierVertex(14, -20 + flap, 4, -22 - flap, -6 - speed * 8, -24 + flap * 1.5); p.bezierVertex(2, -18 - flap, 12, -16, 24, -14); p.endShape(p.CLOSE);
-          // skates
-          for (const lx of [-16, 16]) {
-            p.fill(222, 25, 22); ink(0.9); p.rect(lx - 9, -8, 18, 3, 1.5);
-            for (const wx of [lx - 5, lx + 5]) {
-              p.fill(44, 78, 92); ink(0.9); p.circle(wx, -2.5, 6);
-              p.stroke(236, 55, 9, 80); p.strokeWeight(0.5);
-              p.line(wx + Math.cos(wheel) * 2.6, -2.5 + Math.sin(wheel) * 2.6, wx - Math.cos(wheel) * 2.6, -2.5 - Math.sin(wheel) * 2.6);
+          // skates, springing into place when they appear
+          if (skating) {
+            for (const lx of [-16, 16]) {
+              p.push(); p.translate(lx, -4); p.scale(popScale); p.translate(-lx, 4);
+              p.fill(222, 25, 22); ink(0.9); p.rect(lx - 9, -8, 18, 3, 1.5);
+              for (const wx of [lx - 5, lx + 5]) {
+                p.fill(44, 78, 92); ink(0.9); p.circle(wx, -2.5, 6);
+                p.stroke(236, 55, 9, 80); p.strokeWeight(0.5);
+                p.line(wx + Math.cos(wheel) * 2.6, -2.5 + Math.sin(wheel) * 2.6, wx - Math.cos(wheel) * 2.6, -2.5 - Math.sin(wheel) * 2.6);
+              }
+              p.pop();
             }
           }
-          // legs, tail, head
+          // legs (stepping while on foot), tail, head
           p.fill(78, 24, 40); ink(1);
-          for (const lx of [-16, 16]) { p.beginShape(); p.vertex(lx - 5, -14); p.bezierVertex(lx - 6, -10, lx - 5, -8, lx - 4, -8); p.vertex(lx + 4, -8); p.bezierVertex(lx + 5, -10, lx + 6, -12, lx + 5, -14); p.endShape(p.CLOSE); }
+          [-16, 16].forEach((lx, i) => {
+            const step = skating ? 0 : Math.max(0, Math.sin(t * 3 + i * Math.PI)) * 2.2;
+            const foot = skating ? -8 : 0;
+            p.beginShape(); p.vertex(lx - 5, -14); p.bezierVertex(lx - 6, -10, lx - 5, foot, lx - 4 + step, foot - step * 0.4); p.vertex(lx + 4 + step, foot - step * 0.4); p.bezierVertex(lx + 5, foot, lx + 6, -12, lx + 5, -14); p.endShape(p.CLOSE);
+          });
           p.triangle(-30, -12, -36, -10, -29, -9);
-          const nod = Math.sin(t * 4.2) * 1.2 * speed;
+          const nod = skating ? Math.sin(t * 4.2) * 1.2 * speed : Math.sin(t * 3) * 0.8;
           p.beginShape(); p.vertex(22, -16); p.bezierVertex(28, -18, 31, -22 + nod, 34, -24 + nod); p.vertex(36, -16 + nod); p.bezierVertex(32, -14, 28, -12, 22, -11); p.endShape(p.CLOSE);
           p.ellipse(39, -21 + nod, 15, 12);
           p.fill(236, 60, 6); p.noStroke(); p.circle(41.5, -23 + nod, 2.8);
@@ -632,6 +661,8 @@ export function sceneSketch(kind: string, host: HTMLElement, reduced: boolean) {
       p.pop();
       p.image(vig, 0, 0, w, h);
     };
+
+    p.setReveal = on => { reveal.on = on; if (reduced) p.redraw(); };
 
     p.relayout = () => {
       const pw = w, ph = h;
