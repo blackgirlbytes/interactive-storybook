@@ -1,0 +1,77 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M88JGK1S414E9RNATSAJ57HZ",
+  "session_id": "01a21111-fc19-7383-a8c8-d36bcb713386",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T05:23:04.600619Z",
+  "branch": "codex/storybook-updates-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/globals.css",
+    "app/night.css",
+    "components/Library.tsx",
+    "components/Replay.tsx",
+    "lib/audio/client.ts",
+    "lib/audio/session.ts",
+    "lib/engine/prompts.ts",
+    "lib/stories/index.ts",
+    "lib/stories/standardArt.ts",
+    "lib/voices.ts",
+    "tests/flux.test.ts",
+    "tests/session.test.ts",
+    "tests/standardArt.test.ts"
+  ],
+  "agent": "Codex",
+  "model": "gpt-6-sol",
+  "turn_id": "cded6586100e",
+  "checkpoint_transcript_start": 740,
+  "transcript_lines_at_start": 740,
+  "compact_transcript_start": 145,
+  "token_usage": {
+    "input_tokens": 65924,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3133568,
+    "output_tokens": 8358,
+    "api_call_count": 49,
+    "subagent_tokens": {
+      "input_tokens": 81497,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 3502208,
+      "output_tokens": 19640,
+      "api_call_count": 54
+    },
+    "subagent_tokens_complete": true
+  },
+  "session_token_usage": {
+    "input_tokens": 146007,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7739520,
+    "output_tokens": 22652,
+    "api_call_count": 127,
+    "subagent_tokens": {
+      "input_tokens": 183358,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 7204736,
+      "output_tokens": 37133,
+      "api_call_count": 124
+    },
+    "subagent_tokens_complete": true
+  },
+  "redaction": {
+    "replacements": 1278,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 1593,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 2
+  }
+}

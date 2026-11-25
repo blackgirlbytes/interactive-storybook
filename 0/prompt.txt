@@ -1,0 +1,1 @@
+take a look at the findings from the trails in code review\..lets use subagents to solve those

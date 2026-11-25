@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "01a21125-f5a0-72f3-abd9-a16be66338e8",
+  "agent_id": "01a21125-f5a0-72f3-abd9-a16be66338e8",
+  "subagent_type": "default",
+  "files": [
+    "lib/audio/session.ts",
+    "lib/audio/client.ts",
+    "tests/session.test.ts",
+    "tests/flux.test.ts"
+  ],
+  "token_usage": {
+    "input_tokens": 31392,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1421184,
+    "output_tokens": 8360,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-25T00:20:32.090638-05:00",
+  "completed_at": "2026-11-25T00:23:03.571438-05:00"
+}
