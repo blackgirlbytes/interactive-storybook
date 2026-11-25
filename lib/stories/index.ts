@@ -2,7 +2,8 @@ import type { StoryDef } from "@/lib/types";
 import { voiceModel as v } from "@/lib/voices";
 
 export const ART_STYLE =
-  "Warm watercolor children's picture book illustration, soft pastel colors, gentle golden lighting, friendly rounded characters with big expressive eyes, cozy and whimsical, no text or letters";
+  "Rich gouache and ink children's picture book illustration set at twilight and under moonlight: deep indigo and blue shadows, warm lamplight-gold glows from lanterns, windows and fireflies, soft silvery rim light on the characters, fine hand-drawn ink outlines, textured paper grain, friendly expressive characters, cozy and magical, never scary, no text or letters";
+const CHRISTMAS_ART_STYLE = ART_STYLE.replace("lanterns, windows and fireflies", "lanterns and windows");
 
 export const CLASSIC_STORIES: StoryDef[] = [
   {
@@ -95,6 +96,30 @@ export const CLASSIC_STORIES: StoryDef[] = [
       { title: "The tricky wolf", goal: "The Wolf hurries ahead to Grandma's, hides Grandma in the closet, and puts on her nightcap" },
       { title: "What big eyes", goal: "Red arrives and notices Grandma looks very strange: what big eyes, ears and teeth" },
       { title: "Rescue and home", goal: "The Woodcutter chases the Wolf away (no one is hurt), Grandma is found safe, and they share treats; Red promises to stay on the path" },
+    ],
+  },
+  {
+    id: "first-christmas",
+    title: "The First Christmas",
+    emoji: "⭐",
+    blurb: "Travel to Bethlehem with Mary and Joseph, then meet the shepherds who hear wonderful news.",
+    category: "bible",
+    setting: "Bethlehem long ago: a lantern-lit road, a humble stable, and quiet fields beneath a bright star",
+    artStyle: CHRISTMAS_ART_STYLE,
+    narratorVoice: v("hannah"),
+    characters: [
+      { id: "mary", name: "Mary", personality: "Gentle, thoughtful, brave, and full of love for her newborn son Jesus", look: "a young woman with warm brown skin, a blue head covering and a simple cream robe", voice: v("sienna") },
+      { id: "joseph", name: "Joseph", personality: "Kind, steady, and caring; he helps Mary and keeps the family comfortable", look: "a young man with warm brown skin, short dark hair, a soft beard and a brown robe", voice: v("miles") },
+      { id: "angel", name: "The Angel", personality: "Warm and reassuring, bringing joyful news to the shepherds", look: "a gentle glowing angel in a flowing cream robe, with soft wings and a golden halo", voice: v("gemma") },
+      { id: "shepherd", name: "A Shepherd", personality: "Curious, humble, and eager to share the joyful news", look: "a friendly shepherd with a weathered face, a woven cloak and a wooden staff", voice: v("kit") },
+    ],
+    beats: [
+      { title: "The road to Bethlehem", goal: "Mary and Joseph travel to Bethlehem for the census; Mary is expecting a baby and Joseph helps her along the lantern-lit road" },
+      { title: "A place to rest", goal: "Bethlehem is crowded and there is no guest room; Mary and Joseph find a humble, sheltered place with a manger where they can rest safely" },
+      { title: "Baby Jesus is born", goal: "Jesus is born; Mary wraps him warmly and lays him in the manger while Joseph stays beside them" },
+      { title: "Good news in the fields", goal: "An angel appears to shepherds watching their sheep at night, calms their fear, and announces the joyful news of Jesus' birth" },
+      { title: "The shepherds visit", goal: "The shepherds hurry to Bethlehem, find Mary, Joseph and baby Jesus, and share what the angel told them" },
+      { title: "A peaceful Christmas night", goal: "The shepherds return praising God; Mary treasures the moment and the family rests together in peace beneath the starry sky" },
     ],
   },
 ];

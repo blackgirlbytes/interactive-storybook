@@ -26,8 +26,12 @@ class Recorder {
   static isTypeSupported = vi.fn(() => true);
   state = "inactive";
   ondataavailable?: (event: { data: Blob }) => void;
+  onstop?: () => void;
   start = vi.fn(() => { this.state = "recording"; });
-  stop = vi.fn(() => { this.state = "inactive"; });
+  stop = vi.fn(() => {
+    this.state = "inactive";
+    queueMicrotask(() => { this.ondataavailable?.({ data: new Blob(["last audio"]) }); this.onstop?.(); });
+  });
   constructor(public stream: unknown, public options: unknown) { Recorder.latest = this; }
 }
 beforeEach(() => {
@@ -62,7 +66,7 @@ describe("Flux TTS route", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("audio/mpeg");
     expect(await res.text()).toBe("audio");
-    expect(fetchMock).toHaveBeenCalledWith("https://api.deepgram.com/v2/speak?model=flux-hannah-en&encoding=mp3", expect.objectContaining({ body: JSON.stringify({ text: "Once upon a time." }) }));
+    expect(fetchMock).toHaveBeenCalledWith("https://api.deepgram.com/v2/speak?model=flux-hannah-en&encoding=mp3&expressivity=1", expect.objectContaining({ body: JSON.stringify({ text: "Once upon a time." }) }));
   });
   it("rejects unsupported voices without contacting Deepgram", async () => {
     const res = await POST(new Request("http://localhost/api/tts", { method: "POST", body: JSON.stringify({ text: "Hello.", voice: "unknown" }) }));
@@ -85,7 +89,9 @@ describe("Flux microphone", () => {
     const chunk = new Blob(["audio"]);
     Recorder.latest.ondataavailable?.({ data: chunk });
     expect(socket.send).toHaveBeenCalledWith(chunk);
-    socket.message({ type: "TurnInfo", event: "StartOfTurn", transcript: "Um" });
+    socket.message({ type: "TurnInfo", event: "StartOfTurn", transcript: "" });
+    expect(interim).not.toHaveBeenCalled();
+    socket.message({ type: "TurnInfo", event: "Update", transcript: "Um" });
     socket.message({ type: "TurnInfo", event: "Update", transcript: "Um, give the tortoise roller skates." });
     expect(interim).toHaveBeenCalledTimes(2);
     expect(final).not.toHaveBeenCalled();
@@ -97,6 +103,62 @@ describe("Flux microphone", () => {
     expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: "CloseStream" }));
     expect(stopTrack).toHaveBeenCalledOnce();
     expect(error).not.toHaveBeenCalled();
+  });
+  it("keeps a half-finished idea when the microphone is turned off", async () => {
+    fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
+    const interim = vi.fn(), final = vi.fn(), error = vi.fn();
+    const mic = new Microphone();
+    await mic.start(interim, final, error);
+    const socket = Socket.latest;
+    socket.message({ type: "TurnInfo", event: "StartOfTurn", transcript: "" });
+    socket.message({ type: "TurnInfo", event: "Update", transcript: "The tortoise has roller" });
+    const finishing = mic.finish();
+    await vi.waitFor(() => expect(socket.send).toHaveBeenCalledWith(JSON.stringify({ type: "ForceEndTurn" })));
+    const sent = socket.send.mock.calls.map(([data]) => data);
+    // The recorder's last chunk goes out before Flux is told the turn is over.
+    expect(sent.findIndex(d => d instanceof Blob)).toBeLessThan(sent.indexOf(JSON.stringify({ type: "ForceEndTurn" })));
+    expect(socket.send).not.toHaveBeenCalledWith(JSON.stringify({ type: "CloseStream" }));
+    socket.message({ type: "TurnInfo", event: "EndOfTurn", transcript: "The tortoise has roller skates.", trigger: "manual" });
+    await expect(finishing).resolves.toBe("The tortoise has roller skates.");
+    expect(socket.send).toHaveBeenLastCalledWith(JSON.stringify({ type: "CloseStream" }));
+    expect(final).not.toHaveBeenCalled();
+    expect(stopTrack).toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+  it("keeps a final transcript received while the recorder is draining", async () => {
+    fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
+    const final = vi.fn();
+    const mic = new Microphone();
+    await mic.start(vi.fn(), final, vi.fn());
+    const socket = Socket.latest;
+    const recorder = Recorder.latest;
+    recorder.stop.mockImplementationOnce(() => { recorder.state = "inactive"; });
+    socket.message({ type: "TurnInfo", event: "Update", transcript: "A purple dragon" });
+    const finishing = mic.finish();
+    socket.message({ type: "TurnInfo", event: "EndOfTurn", transcript: "A purple dragon with wings" });
+    expect(final).not.toHaveBeenCalled();
+    recorder.onstop?.();
+    await expect(finishing).resolves.toBe("A purple dragon with wings");
+    expect(socket.send).not.toHaveBeenCalledWith(JSON.stringify({ type: "ForceEndTurn" }));
+  });
+  it("closes straight away when the child isn't speaking", async () => {
+    fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
+    const mic = new Microphone();
+    await mic.start(vi.fn(), vi.fn(), vi.fn());
+    const socket = Socket.latest;
+    socket.message({ type: "TurnInfo", event: "Update", transcript: "Hello" });
+    socket.message({ type: "TurnInfo", event: "EndOfTurn", transcript: "Hello" });
+    await expect(mic.finish()).resolves.toBe("");
+    expect(socket.send).not.toHaveBeenCalledWith(JSON.stringify({ type: "ForceEndTurn" }));
+    expect(socket.send).toHaveBeenLastCalledWith(JSON.stringify({ type: "CloseStream" }));
+  });
+  it("falls back to the latest words if the final transcript doesn't arrive", async () => {
+    fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
+    const mic = new Microphone();
+    await mic.start(vi.fn(), vi.fn(), vi.fn());
+    Socket.latest.message({ type: "TurnInfo", event: "Update", transcript: "A purple dragon" });
+    await expect(mic.finish(20)).resolves.toBe("A purple dragon");
+    expect(Socket.latest.close).toHaveBeenCalled();
   });
   it("cleans up the microphone on a provider error", async () => {
     fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));

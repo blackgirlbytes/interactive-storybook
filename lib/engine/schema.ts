@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { MOODS } from "@/lib/audio/expression";
 
 const shortText = (max: number) => z.string().trim().min(1).max(max);
 
 export const TurnSchema = z.object({
   segments: z
-    .array(z.object({ speaker: shortText(60), text: shortText(600) }))
+    .array(z.object({ speaker: shortText(60), text: shortText(600), mood: z.enum(MOODS).optional().catch(undefined) }))
     .min(1)
     .max(6),
   stateChanges: z
@@ -26,6 +27,7 @@ export const TurnSchema = z.object({
     .prefault({}),
   advanceBeat: z.boolean().default(false),
   imagePrompt: z.string().trim().max(800).nullish(),
+  motionPrompt: z.string().trim().max(300).nullish(),
   awaitChild: z.boolean().default(false),
   isEnding: z.boolean().default(false),
 });

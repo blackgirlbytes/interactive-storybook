@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
+import { buildVideoInput } from "@/lib/engine/videoPrompt";
 import { falQueueResult, falQueueStatus, falQueueSubmit, VIDEO_MODEL } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
 
-const Body = z.object({ imageUrl: z.string().url(), scene: z.string().trim().min(1).max(800) });
+const Body = z.object({ imageUrl: z.string().min(1).max(2000), scene: z.string().trim().min(1).max(800), motion: z.string().trim().max(300).optional() });
 const FAL_MEDIA_HOST = /(^|\.)fal\.media$/;
 const REQUEST_ID = /^[0-9a-f-]{36}$/i;
 
@@ -11,20 +11,17 @@ export async function POST(req: Request) {
   try {
     if (!VIDEO_MODEL) return Response.json({ disabled: true });
     const parsed = Body.safeParse(await req.json().catch(() => null));
-    if (!parsed.success || !FAL_MEDIA_HOST.test(new URL(parsed.data.imageUrl).hostname)) {
+    if (!parsed.success) {
       return Response.json({ error: "Invalid video request" }, { status: 400 });
     }
-    const { imageUrl, scene } = parsed.data;
-    const id = await falQueueSubmit(VIDEO_MODEL, {
-      prompt: buildVideoPrompt(scene),
-      image_url: imageUrl,
-      // Matching first and last frames makes the clip loop without a visible jump.
-      end_image_url: imageUrl,
-      duration: 5,
-      resolution: "768P",
-      prompt_expansion_mode: "balanced",
-      enable_safety_checker: true,
-    }, req.signal);
+    const { imageUrl, scene, motion } = parsed.data;
+    let falMedia = false;
+    try {
+      const remote = new URL(imageUrl);
+      falMedia = remote.protocol === "https:" && FAL_MEDIA_HOST.test(remote.hostname);
+    } catch { /* Only generated fal images can be submitted for video. */ }
+    if (!falMedia) return Response.json({ error: "Invalid video request" }, { status: 400 });
+    const id = await falQueueSubmit(VIDEO_MODEL, buildVideoInput(imageUrl, scene, motion), req.signal);
     return Response.json({ id });
   } catch (err) {
     return errorResponse(err);

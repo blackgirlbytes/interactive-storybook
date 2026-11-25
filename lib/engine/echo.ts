@@ -1,9 +1,6 @@
-const words = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9' ]+/g, " ")
-    .split(/\s+/)
-    .filter(Boolean);
+import { wordList } from "@/lib/text/words";
+
+const words = (s: string) => wordList(s.toLowerCase());
 
 /**
  * Speakers can leak narration back into the microphone even with echo

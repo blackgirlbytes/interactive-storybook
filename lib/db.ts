@@ -7,6 +7,7 @@ export interface AdventurePage {
   image?: Blob;
   video?: Blob;
   scene?: string;
+  standardArtUrl?: string;
 }
 export interface Adventure {
   id: string;

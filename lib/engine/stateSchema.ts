@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LANGUAGE_CODES } from "@/lib/languages";
 
 const Character = z.object({
   id: z.string().max(60),
@@ -20,6 +21,7 @@ const Story = z.object({
   narratorVoice: z.string().max(40),
   characters: z.array(Character).max(12),
   beats: z.array(z.object({ title: z.string().max(100), goal: z.string().max(400) })).min(1).max(10),
+  language: z.enum(LANGUAGE_CODES).optional(),
 });
 
 export const StoryStateSchema = z.object({
