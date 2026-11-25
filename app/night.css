@@ -1,0 +1,158 @@
+/* "Once upon tonight": deep indigo night, lamplight gold, ember red.
+   Loaded after globals.css and overrides its daytime palette. */
+
+:root {
+  color-scheme: dark;
+  --paper: #10152e;
+  --night-1: #171d3d;
+  --night-2: #1d2448;
+  --night-3: #252d57;
+  --ink: #f3ead8;
+  --muted: #b7b4d2;
+  --faint: #8e8db3;
+  --line: #2c3563;
+  --lamp: #f2bd57;
+  --lamp-strong: #ffd27a;
+  --on-lamp: #241703;
+  --ember: #c9443a;
+  --green: var(--lamp);
+  --orange: var(--lamp);
+}
+
+body {
+  font-family: var(--font-body), "Nunito", system-ui, sans-serif;
+  font-size: 16px;
+  background:
+    radial-gradient(900px 520px at 85% -8%, rgba(242, 189, 87, .10), transparent 60%),
+    radial-gradient(1100px 700px at 10% 0%, rgba(70, 86, 170, .28), transparent 65%),
+    var(--paper);
+  background-attachment: fixed;
+}
+h1, h2, h3, .brand, .book-label strong, .speech-note, .narration p, .chat-message p, .interaction-bar label, .phonics-part {
+  font-family: var(--font-display), Georgia, serif;
+}
+h1 { letter-spacing: -1.4px; font-weight: 500; }
+h2 { letter-spacing: -.6px; font-weight: 500; }
+h3 { letter-spacing: -.3px; font-weight: 500; }
+h1 em { color: var(--lamp-strong); font-style: italic; }
+:focus-visible { outline-color: var(--lamp-strong); }
+
+/* the illustrations */
+/* The canvas never takes part in layout: CSS alone sizes the box, and the
+   sketch fits itself to it. Otherwise the canvas widens its grid column, the
+   resize observer sees a bigger box, and the scene grows without end. */
+.scene-art { position: relative; width: 100%; height: 100%; min-width: 0; background: linear-gradient(#0b1030, #222a5e); overflow: hidden; contain: strict; }
+.scene-art canvas { position: absolute; inset: 0; display: block; max-width: 100%; max-height: 100%; }
+.hero-art, .hero-copy, .reader-grid > *, .story-card { min-width: 0; }
+.hero-book .scene-art { aspect-ratio: 600 / 440; height: auto; }
+.picture-panel .scene-art { position: absolute; inset: 0; }
+.cover .scene-art { transition: transform .5s; }
+.story-card:hover .cover .scene-art { transform: scale(1.04); }
+
+/* nav */
+.nav { border-bottom-color: var(--line); }
+.brand { font-weight: 600; letter-spacing: -1px; }
+.brand-mark, .brand-dot { color: var(--lamp); }
+.nav nav { font-size: 14px; }
+.nav nav a.active { color: var(--lamp-strong); box-shadow: 0 2px var(--lamp); }
+.nav nav .nav-create { background: rgba(242, 189, 87, .12); color: var(--lamp-strong); border: 1px solid rgba(242, 189, 87, .3); }
+
+/* type that was too small to read */
+.eyebrow { font-size: 12px; color: var(--lamp); letter-spacing: 2.2px; }
+.eyebrow > span { background: var(--lamp); }
+.hero-description { font-size: 17px; color: var(--muted); }
+.hero-note { font-size: 13px; color: var(--faint); }
+.how-strip strong { font-size: 15px; }
+.how-strip p > span { font-size: 13px; color: var(--muted); }
+.card-meta { font-size: 12px; color: var(--faint); }
+.card-text p { font-size: 14px; color: var(--muted); min-height: 0; }
+.card-action { font-size: 13px; color: var(--lamp-strong); border-top-color: var(--line); margin-top: auto; }
+.cover-badge { font-size: 12px; background: rgba(13, 17, 42, .72); color: var(--ink); backdrop-filter: blur(6px); }
+.cover-arrow { background: rgba(243, 234, 216, .92); color: #1b1d36; }
+.filters button { font-size: 14px; border-color: var(--line); color: var(--ink); }
+.filters button.selected { background: var(--lamp); color: var(--on-lamp); border-color: var(--lamp); }
+.small { font-size: 14px; }
+.create-banner p { font-size: 14px; color: var(--muted); }
+footer { color: var(--faint); }
+footer p, footer > span { font-size: 13px; }
+footer .brand { color: var(--lamp); }
+.button { font-size: 15px; }
+
+/* buttons */
+.primary { background: var(--lamp); color: var(--on-lamp); font-weight: 700; }
+.primary:hover { background: var(--lamp-strong); }
+.secondary { border-color: rgba(243, 234, 216, .22); color: var(--ink); }
+.secondary:hover:not(:disabled) { background: rgba(243, 234, 216, .06); }
+.light { background: var(--lamp); color: var(--on-lamp); font-weight: 700; }
+
+/* hero */
+.hero-book { background: var(--night-2); border: 6px solid #2a335f; box-shadow: 10px 14px 0 #0a0e24, 0 30px 90px rgba(242, 189, 87, .10); }
+.book-label { background: var(--night-2); }
+.book-label span { color: var(--lamp); font-size: 11px; }
+.book-label strong { color: var(--ink); }
+.orbit-star { color: var(--lamp); }
+.speech-note { background: #f6ecd7; color: #23203d; border-color: #e9dcbf; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.how-strip, .how-strip > div { border-color: var(--line); }
+.step-icon { border-color: rgba(242, 189, 87, .4); color: var(--lamp-strong); }
+
+/* cards */
+.story-card { display: flex; flex-direction: column; background: var(--night-1); border-color: var(--line); }
+.story-card:hover { box-shadow: 0 16px 40px rgba(0, 0, 0, .45), 0 0 0 1px rgba(242, 189, 87, .25); }
+.cover { background: #0b1030; }
+.card-text { flex: 1; display: flex; flex-direction: column; }
+.card-text h3 { min-height: 0; }
+.create-banner { background: var(--night-2); border: 1px solid var(--line); }
+.banner-star { color: var(--lamp); }
+
+/* reader */
+.reader-grid { background: var(--night-1); border-color: var(--line); }
+.picture-panel { background: #0b1030; }
+.picture-caption { background: rgba(13, 17, 42, .74); color: var(--ink); font-size: 13px; backdrop-filter: blur(8px); }
+.mode-switch { background: var(--night-3); border-color: var(--line); }
+.mode-switch button { font-size: 14px; }
+.mode-switch button[aria-pressed=true] { background: var(--lamp); color: var(--on-lamp); font-weight: 700; }
+.status { font-size: 13px; color: var(--muted); }
+.live-dot { background: var(--ember); box-shadow: 0 0 0 4px rgba(201, 68, 58, .28); }
+.speaker { color: var(--lamp); font-size: 11px; }
+.narration p.small { font: 14px/1.8 var(--font-body), sans-serif; }
+.interaction-bar { background: var(--night-2); border-color: var(--line); }
+.mic-symbol { color: var(--lamp); }
+.input-row { background: var(--paper); border-color: var(--line); }
+.input-row input { color: var(--ink); font-size: 15px; }
+.input-row input::placeholder { color: var(--faint); }
+.input-row button { background: var(--lamp); color: var(--on-lamp); }
+.interaction-bar > p { font-size: 13px; color: var(--muted); }
+.back-link { font-size: 14px; }
+.error { background: rgba(201, 68, 58, .16); color: #ffb9ad; font-size: 14px; }
+.notice { background: rgba(242, 189, 87, .12); color: var(--lamp-strong); font-size: 14px; }
+.transcript { font-size: 14px; }
+.storage-note { font-size: 13px; }
+
+/* create + shelf */
+.chat-card { background: var(--night-1); border-color: var(--line); }
+.guide-emblem { color: var(--lamp); }
+.chat-message.guide { background: var(--night-3); }
+.chat-message.child { background: #3a2b2a; }
+.empty-state { background: var(--night-1); border-color: var(--line); }
+.empty-state > span { color: var(--lamp); }
+.empty-state p { color: var(--muted); }
+.skip-link { background: var(--lamp); color: var(--on-lamp); }
+
+/* language, read-along and phonics */
+.language-picker { font-size: 13px; color: var(--muted); }
+.language-picker select { background: var(--night-3); color: var(--ink); border-color: var(--line); }
+.narration .reading-word { background: rgba(242, 189, 87, .3); color: var(--ink); box-shadow: 0 0 0 2px rgba(242, 189, 87, .3); }
+.narration .word.tappable { text-decoration-color: rgba(242, 189, 87, .5); }
+.narration .word.tappable:hover, .narration .word.tappable:focus-visible { background: rgba(243, 234, 216, .1); }
+.narration .word.tappable.reading-word { background: rgba(242, 189, 87, .3); }
+.phonics-card { background: var(--night-3); border-color: var(--line); }
+.phonics-part { background: rgba(243, 234, 216, .07); color: var(--muted); }
+.phonics-part.lit { background: var(--lamp); color: var(--on-lamp); }
+
+.nav nav a { white-space: nowrap; }
+@media (max-width: 700px) {
+  .nav nav { font-size: 13px; gap: 16px; }
+  .card-text p { font-size: 13px; }
+  .card-meta { font-size: 11px; }
+  .hero-description { font-size: 16px; }
+}
