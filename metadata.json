@@ -3,10 +3,18 @@
   "checkpoint_id": "01M884FW6KNWG1MQW2XSEAB81B",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 9,
+  "checkpoints_count": 10,
   "files_touched": [
+    "README.md",
+    "app/api/image/route.ts",
+    "app/api/video/route.ts",
     "lib/audio/client.ts",
-    "lib/audio/session.ts"
+    "lib/audio/session.ts",
+    "lib/engine/imagePrompt.ts",
+    "lib/engine/prompts.ts",
+    "lib/engine/schema.ts",
+    "lib/engine/videoPrompt.ts",
+    "tests/visuals.test.ts"
   ],
   "sessions": [
     {
@@ -22,24 +30,31 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 107888,
+    "input_tokens": 343221,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1836416,
-    "output_tokens": 7784,
-    "api_call_count": 27
+    "cache_read_tokens": 10608256,
+    "output_tokens": 45570,
+    "api_call_count": 53
   },
   "redaction": {
-    "replacements": 16,
+    "replacements": 21,
     "layers": {
       "betterleaks": 3,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 2,
       "credentialed_uri": 0,
-      "entropy": 15,
+      "entropy": 20,
       "key_context": 0,
       "provider_token": 0,
       "shell_stdin": 0
