@@ -1,0 +1,33 @@
+install these skills
+
+[https://github.com/deepgram/skills](https://github.com/deepgram/skills)
+
+---
+
+take a look at my project..get an understanding or tour of what it is.. then take a look at these skills and determine what we can do to improve my project..please dont make changes yet..just return to me with suggestions
+
+---
+
+write what youre saying more simply
+
+---
+
+also the experience..or reaction is really slow\...if a child say something it takes long to update..is that one of the things u pointed out
+
+---
+
+i dont really understand what u mean here..explain in more detail
+
+**Make Pause really pause.** In Play & talk mode, the microphone stays on after Pause. A child speaking can start the story again.
+
+---
+
+okay lets have two different buttons..one that pauses the narrator..so the user can speak..and one that pauses listening and narrator altogether.
+
+---
+
+did you use a skill to help you
+
+---
+
+did you commit the changes as addressed in the AGENTS.md
