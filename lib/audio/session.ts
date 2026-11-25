@@ -7,7 +7,7 @@ import { storyLanguage } from "@/lib/languages";
 import { WordClock } from "@/lib/text/wordClock";
 import type { AdventurePage } from "@/lib/db";
 import { isLikelyEcho } from "@/lib/engine/echo";
-import { standardArtUrl } from "@/lib/stories/standardArt";
+import { standardArtUrl, standardVideoUrl } from "@/lib/stories/standardArt";
 import { charactersInScene, type ImageReference } from "@/lib/engine/imagePrompt";
 
 const CHILD_REPLY_WAIT_MS = 8000;
@@ -474,7 +474,14 @@ export class StorySession {
     const controller = new AbortController();
     this.imageControllers.add(controller);
     this.videoJobs++; this.view.videoBusy = true; this.emit();
-    void animateScene(imageUrl, scene, motion, controller.signal)
+    const shippedVideo = standardVideoUrl(imageUrl);
+    const videoJob = shippedVideo
+      ? fetch(shippedVideo, { signal: controller.signal }).then(response => {
+          if (!response.ok) throw new Error(`Could not open the standard animation (${response.status})`);
+          return response.blob();
+        })
+      : animateScene(imageUrl, scene, motion, controller.signal);
+    void videoJob
       .then(video => {
         if (!video || this.closed) return;
         // Later pages that reuse this picture should move too.

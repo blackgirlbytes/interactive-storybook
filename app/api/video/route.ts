@@ -2,8 +2,6 @@ import { z } from "zod";
 import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
 import { falQueueResult, falQueueStatus, falQueueSubmit, VIDEO_MODEL } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
-import { isStandardArtUrl } from "@/lib/stories/standardArt";
-import { standardArtDataUri } from "@/lib/server/standardArt";
 
 const Body = z.object({ imageUrl: z.string().min(1).max(2000), scene: z.string().trim().min(1).max(800), motion: z.string().trim().max(300).optional() });
 const FAL_MEDIA_HOST = /(^|\.)fal\.media$/;
@@ -17,20 +15,17 @@ export async function POST(req: Request) {
       return Response.json({ error: "Invalid video request" }, { status: 400 });
     }
     const { imageUrl, scene, motion } = parsed.data;
-    const canonical = isStandardArtUrl(imageUrl);
     let falMedia = false;
     try {
       const remote = new URL(imageUrl);
       falMedia = remote.protocol === "https:" && FAL_MEDIA_HOST.test(remote.hostname);
-    } catch { /* A local path must match the shipped art list. */ }
-    if (!canonical && !falMedia) return Response.json({ error: "Invalid video request" }, { status: 400 });
-    const modelImage = canonical ? await standardArtDataUri(imageUrl) : imageUrl;
+    } catch { /* Only generated fal images can be submitted for video. */ }
+    if (!falMedia) return Response.json({ error: "Invalid video request" }, { status: 400 });
     const id = await falQueueSubmit(VIDEO_MODEL, {
       prompt: buildVideoPrompt(scene, motion),
-      image_url: modelImage,
+      image_url: imageUrl,
       // Matching first and last frames makes the clip loop without a visible jump.
-      end_image_url: modelImage,
-      ...(canonical ? { seed: [...imageUrl].reduce((seed, char) => (seed * 31 + char.charCodeAt(0)) >>> 0, 7) } : {}),
+      end_image_url: imageUrl,
       duration: 5,
       resolution: "768P",
       prompt_expansion_mode: "disabled",

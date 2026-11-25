@@ -15,3 +15,8 @@ export function standardArtUrl(story: StoryDef, beatIndex: number): string | und
 export function isStandardArtUrl(url: string): boolean {
   return STANDARD_ART_URLS.has(url);
 }
+
+export function standardVideoUrl(imageUrl: string): string | undefined {
+  if (!isStandardArtUrl(imageUrl)) return;
+  return imageUrl.replace("/story-art/", "/story-video/").replace(/\.jpg$/, ".mp4");
+}

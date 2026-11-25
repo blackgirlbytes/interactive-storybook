@@ -2,10 +2,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import ts from "typescript";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const scenes = JSON.parse(await fs.readFile(path.join(scriptDir, "story-art-scenes.json"), "utf8"));
+const run = promisify(execFile);
 
 const model = process.env.FAL_VIDEO_MODEL || "minimax/h3-max-turbo/image-to-video";
 const queueApp = model.split("/").slice(0, 2).join("/");
@@ -77,27 +80,52 @@ async function generate(story, index, buildVideoPrompt, force) {
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.toString("ascii", 4, 8) !== "ftyp") throw new Error(`Invalid MP4 for ${story.id} beat ${index}`);
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, bytes);
-  await fs.unlink(pendingFile);
-  console.log(`Saved ${story.id} beat ${index} (${bytes.length} bytes)`);
+  const rawFile = `${file}.raw.mp4`;
+  const outputFile = `${file}.tmp.mp4`;
+  try {
+    await fs.writeFile(rawFile, bytes);
+    // The model's MP4 is ~7 MB for five seconds. H.264 at CRF 25 is ~1 MB and needs no audio track.
+    await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", rawFile,
+      "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "25", "-pix_fmt", "yuv420p", "-movflags", "+faststart", outputFile]);
+    const compressed = await fs.readFile(outputFile);
+    if (compressed.toString("ascii", 4, 8) !== "ftyp") throw new Error(`Invalid compressed MP4 for ${story.id} beat ${index}`);
+    await fs.rename(outputFile, file);
+    await fs.unlink(pendingFile);
+    console.log(`Saved ${story.id} beat ${index} (${compressed.length} bytes)`);
+  } finally {
+    await Promise.allSettled([fs.unlink(rawFile), fs.unlink(outputFile)]);
+  }
 }
 
 async function main() {
   if (!process.env.FAL_KEY) throw new Error("Set FAL_KEY before generating story video.");
   if (model === "off") throw new Error("FAL_VIDEO_MODEL is off.");
+  await run("ffmpeg", ["-version"]);
   const force = process.argv.includes("--force");
   const onlyStory = process.argv.find(arg => arg.startsWith("--story="))?.split("=")[1];
   const onlyBeat = process.argv.find(arg => arg.startsWith("--beat="))?.split("=")[1];
   const { CLASSIC_STORIES } = await loadModule(path.join(scriptDir, "../lib/stories/index.ts"), () => ({ voiceModel: name => name }));
   const { buildVideoPrompt } = await loadModule(path.join(scriptDir, "../lib/engine/videoPrompt.ts"));
+  const tasks = [];
   for (const story of CLASSIC_STORIES) {
     if (onlyStory && story.id !== onlyStory) continue;
     if (scenes[story.id]?.length !== story.beats.length) throw new Error(`Missing scenes for ${story.id}`);
     for (const [index] of story.beats.entries()) {
       if (onlyBeat !== undefined && Number(onlyBeat) !== index) continue;
-      await generate(story, index, buildVideoPrompt, force);
+      tasks.push({ story, index });
     }
   }
+  if (!tasks.length) throw new Error("No matching story beats.");
+  const workers = Array.from({ length: Math.min(3, tasks.length) }, async () => {
+    for (;;) {
+      const task = tasks.shift();
+      if (!task) return;
+      await generate(task.story, task.index, buildVideoPrompt, force);
+    }
+  });
+  const results = await Promise.allSettled(workers);
+  const failure = results.find(result => result.status === "rejected");
+  if (failure) throw failure.reason;
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

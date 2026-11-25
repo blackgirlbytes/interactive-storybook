@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CLASSIC_STORIES } from "@/lib/stories";
-import { isStandardArtUrl, standardArtUrl } from "@/lib/stories/standardArt";
+import { isStandardArtUrl, standardArtUrl, standardVideoUrl } from "@/lib/stories/standardArt";
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), streamTurn: vi.fn(), speechAudio: vi.fn(), playBlob: vi.fn(), audioDuration: vi.fn(), animateScene: vi.fn(), falImage: vi.fn(), falQueueSubmit: vi.fn() }));
 vi.mock("@/lib/audio/client", () => ({
@@ -53,17 +53,30 @@ describe("standard story illustrations", () => {
     }
   });
 
+  it("ships an MP4 for every built-in beat", async () => {
+    for (const book of CLASSIC_STORIES) {
+      for (let index = 0; index < book.beats.length; index++) {
+        const url = standardVideoUrl(standardArtUrl(book, index)!)!;
+        const bytes = await readFile(join(process.cwd(), "public", url.slice(1)));
+        expect(bytes.toString("ascii", 4, 8)).toBe("ftyp");
+      }
+    }
+    expect(standardVideoUrl("/story-art/../../secret.jpg")).toBeUndefined();
+  });
+
   it("shows the fixed picture without calling fal for an unchanged story", async () => {
     mocks.streamTurn.mockResolvedValue(turn);
     mocks.speechAudio.mockImplementation(() => ({ blob: Promise.resolve(new Blob(["audio"])), play: async () => {} }));
-    mocks.animateScene.mockResolvedValue(undefined);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["picture"], { type: "image/jpeg" }))));
+    const fetchMock = vi.fn(async (url: string) => new Response(new Blob([url], { type: url.endsWith(".mp4") ? "video/mp4" : "image/jpeg" })));
+    vi.stubGlobal("fetch", fetchMock);
     const session = new StorySession(story, () => {});
     await session.turn();
     await vi.waitFor(() => expect(session.view.pages[0].image).toBeInstanceOf(Blob));
     expect(session.view.pages[0].standardArtUrl).toBe("/story-art/tortoise-and-hare/beat-0.jpg");
     expect(mocks.post).not.toHaveBeenCalled();
-    expect(mocks.animateScene).toHaveBeenCalledWith("/story-art/tortoise-and-hare/beat-0.jpg", turn.imagePrompt, turn.motionPrompt, expect.any(AbortSignal));
+    await vi.waitFor(() => expect(session.view.pages[0].video).toBeInstanceOf(Blob));
+    expect(fetchMock).toHaveBeenCalledWith("/story-video/tortoise-and-hare/beat-0.mp4", expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(mocks.animateScene).not.toHaveBeenCalled();
     session.close();
   });
 
@@ -86,17 +99,17 @@ describe("standard story illustrations", () => {
   it("reuses a fixed picture and its animation across turns in the same beat", async () => {
     mocks.streamTurn.mockResolvedValue(turn);
     mocks.speechAudio.mockImplementation(() => ({ blob: Promise.resolve(new Blob(["audio"])), play: async () => {} }));
-    mocks.animateScene.mockResolvedValue(undefined);
-    const fetchMock = vi.fn(async () => new Response(new Blob(["picture"], { type: "image/jpeg" })));
+    const fetchMock = vi.fn(async (url: string) => new Response(new Blob([url], { type: url.endsWith(".mp4") ? "video/mp4" : "image/jpeg" })));
     vi.stubGlobal("fetch", fetchMock);
     const session = new StorySession(story, () => {});
     await session.turn();
-    await vi.waitFor(() => expect(session.view.pages[0].image).toBeInstanceOf(Blob));
+    await vi.waitFor(() => expect(session.view.pages[0].video).toBeInstanceOf(Blob));
     await session.turn();
     expect(session.view.error).toBe("");
     expect(session.view.pages[1].image).toBe(session.view.pages[0].image);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(mocks.animateScene).toHaveBeenCalledTimes(1);
+    expect(session.view.pages[1].video).toBe(session.view.pages[0].video);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mocks.animateScene).not.toHaveBeenCalled();
     session.close();
   });
 
@@ -127,14 +140,11 @@ describe("standard story illustrations", () => {
     }), expect.any(AbortSignal));
   });
 
-  it("can animate a shipped picture without a fal CDN link", async () => {
-    mocks.falQueueSubmit.mockResolvedValue("12345678-1234-1234-1234-123456789abc");
+  it("rejects shipped pictures from the paid video route", async () => {
     const response = await createVideo(new Request("http://localhost/api/video", { method: "POST", body: JSON.stringify({
       imageUrl: "/story-art/tortoise-and-hare/beat-0.jpg", scene: "Tilly and Harry meet", motion: "Tilly nods",
     }) }));
-    expect(response.status).toBe(200);
-    expect(mocks.falQueueSubmit).toHaveBeenCalledWith("minimax/h3-max-turbo/image-to-video", expect.objectContaining({
-      image_url: expect.stringMatching(/^data:image\/jpeg;base64,/), seed: expect.any(Number),
-    }), expect.any(AbortSignal));
+    expect(response.status).toBe(400);
+    expect(mocks.falQueueSubmit).not.toHaveBeenCalled();
   });
 });
