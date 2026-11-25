@@ -3,7 +3,7 @@
   "checkpoint_id": "01M885PZ635NAT21ENND98MN11",
   "session_id": "01a2101e-7211-7503-a60e-dd682dd01f01",
   "strategy": "manual-commit",
-  "created_at": "2026-11-25T01:39:21.596964Z",
+  "created_at": "2026-11-25T01:40:39.531721Z",
   "branch": "codex/consistent-story-art",
   "checkpoints_count": 2,
   "save_step_count": 3,
@@ -14,20 +14,22 @@
   "agent": "Codex",
   "model": "gpt-6-sol",
   "turn_id": "72fe34f64394",
-  "compact_transcript_start": 0,
+  "checkpoint_transcript_start": 1664,
+  "transcript_lines_at_start": 1664,
+  "compact_transcript_start": 348,
   "token_usage": {
-    "input_tokens": 127949,
+    "input_tokens": 9367,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 22260736,
-    "output_tokens": 50864,
-    "api_call_count": 136
+    "cache_read_tokens": 3346688,
+    "output_tokens": 2817,
+    "api_call_count": 14
   },
   "session_token_usage": {
-    "input_tokens": 310315,
+    "input_tokens": 319682,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 28370432,
-    "output_tokens": 74719,
-    "api_call_count": 200
+    "cache_read_tokens": 31717120,
+    "output_tokens": 77536,
+    "api_call_count": 214
   },
   "redaction": {
     "replacements": 17,
