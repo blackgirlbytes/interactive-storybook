@@ -1,0 +1,106 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M886BMPBXC8D7FREFQTPC7JZ",
+  "session_id": "7efcc89a-a536-4269-93dd-2f533db84adc",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T01:50:40.286346Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "save_step_count": 1,
+  "files_touched": [
+    ".env.example",
+    "README.md",
+    "app/api/create/route.ts",
+    "app/api/tts/route.ts",
+    "app/globals.css",
+    "app/story/[id]/page.tsx",
+    "components/CreateStory.tsx",
+    "components/Replay.tsx",
+    "components/StoryPlayer.tsx",
+    "lib/audio/client.ts",
+    "lib/audio/expression.ts",
+    "lib/audio/session.ts",
+    "lib/engine/echo.ts",
+    "lib/engine/prompts.ts",
+    "lib/engine/reducer.ts",
+    "lib/engine/schema.ts",
+    "lib/engine/stateSchema.ts",
+    "lib/engine/streamSegments.ts",
+    "lib/text/wordClock.ts",
+    "lib/types.ts",
+    "lib/voices.ts",
+    "tests/expression.test.ts",
+    "tests/flux.test.ts",
+    "tests/session.test.ts",
+    "tests/visuals.test.ts"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "0b0e1c5701c9",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 72638,
+    "cache_read_tokens": 2273408,
+    "output_tokens": 15000,
+    "api_call_count": 20
+  },
+  "session_token_usage": {
+    "input_tokens": 44,
+    "cache_creation_tokens": 72638,
+    "cache_read_tokens": 2273408,
+    "output_tokens": 15000,
+    "api_call_count": 20
+  },
+  "redaction": {
+    "replacements": 6,
+    "layers": {
+      "betterleaks": 2,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 2,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 2,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "skill_events_version": 1,
+  "skill_events": [
+    {
+      "id": "claude-skill-toolu_01XmmyWKx4jF1z22mNHhPkZG",
+      "event_type": "tool_invocation",
+      "skill": {
+        "name": "text-to-speech"
+      },
+      "source": {
+        "agent": "claude-code",
+        "signal": "skill_tool_use",
+        "confidence": "explicit"
+      },
+      "turn_id": "0b0e1c5701c9",
+      "transcript_anchor": {
+        "unit": "line",
+        "start": 39,
+        "end": 40,
+        "entry_ids": [
+          "b7443b61-d753-45c4-97f1-cd8b884aa8c3"
+        ],
+        "tool_use_id": "toolu_01XmmyWKx4jF1z22mNHhPkZG"
+      },
+      "native": {
+        "tool_name": "Skill",
+        "tool_use_id": "toolu_01XmmyWKx4jF1z22mNHhPkZG"
+      },
+      "collapse": {
+        "target": "tool_pair",
+        "label": "Skill: text-to-speech",
+        "default_collapsed": true
+      }
+    }
+  ],
+  "session_metrics": {
+    "turn_count": 1
+  }
+}

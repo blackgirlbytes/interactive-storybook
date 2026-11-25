@@ -3,8 +3,10 @@
   "checkpoint_id": "01M886BMPBXC8D7FREFQTPC7JZ",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 5,
+  "checkpoints_count": 6,
   "files_touched": [
+    ".env.example",
+    "README.md",
     "app/api/create/route.ts",
     "app/api/phonics/route.ts",
     "app/api/tts/route.ts",
@@ -17,11 +19,14 @@
     "components/Replay.tsx",
     "components/StoryPlayer.tsx",
     "lib/audio/client.ts",
+    "lib/audio/expression.ts",
     "lib/audio/session.ts",
     "lib/engine/echo.ts",
     "lib/engine/prompts.ts",
     "lib/engine/reducer.ts",
+    "lib/engine/schema.ts",
     "lib/engine/stateSchema.ts",
+    "lib/engine/streamSegments.ts",
     "lib/languages.ts",
     "lib/phonics/client.ts",
     "lib/phonics/schema.ts",
@@ -29,6 +34,7 @@
     "lib/text/words.ts",
     "lib/types.ts",
     "lib/voices.ts",
+    "tests/expression.test.ts",
     "tests/flux.test.ts",
     "tests/session.test.ts",
     "tests/visuals.test.ts"
@@ -54,25 +60,32 @@
       "compact_transcript": "/2/transcript.jsonl",
       "content_hash": "/2/content_hash.txt",
       "prompt": "/2/prompt.txt"
+    },
+    {
+      "metadata": "/3/metadata.json",
+      "transcript": "/3/full.jsonl",
+      "compact_transcript": "/3/transcript.jsonl",
+      "content_hash": "/3/content_hash.txt",
+      "prompt": "/3/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 30882,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 946048,
-    "output_tokens": 5410,
-    "api_call_count": 14
+    "input_tokens": 30926,
+    "cache_creation_tokens": 72638,
+    "cache_read_tokens": 3219456,
+    "output_tokens": 20410,
+    "api_call_count": 34
   },
   "redaction": {
-    "replacements": 28,
+    "replacements": 34,
     "layers": {
-      "betterleaks": 3,
+      "betterleaks": 5,
       "connection_string": 0,
       "credential_key": 0,
-      "credential_value": 2,
+      "credential_value": 4,
       "credentialed_uri": 0,
       "entropy": 28,
-      "key_context": 0,
+      "key_context": 2,
       "provider_token": 0,
       "shell_stdin": 0
     }
