@@ -1,0 +1,13 @@
+okay for p5.js and the level of quality..im looking for the output found here https://github.com/blackgirlbytes/genuary2026/blob/main/genuary-skills/days/day03/output/day03.gif you can search around this repo to understand what kind of rules and design styles we used to get this level of quality..focus on the agent skills section
+
+---
+
+what is the painterly p5 thing? are u redoing the ui or are u redoing the story illustrations from fal
+
+---
+
+Illustrations + UI theme
+
+---
+
+the what if the tortoise had roller skates image just keeps getting bigger and bigger and you cant even scroll..its an accessibility issue
