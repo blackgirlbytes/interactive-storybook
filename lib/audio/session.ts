@@ -5,6 +5,7 @@ import type { StreamedSegment } from "@/lib/engine/streamSegments";
 import { animateScene, Microphone, playBlob, post, speech, speechAudio, streamTurn, type SpeechAudio } from "./client";
 import type { AdventurePage } from "@/lib/db";
 import { isLikelyEcho } from "@/lib/engine/echo";
+import { charactersInScene, type ImageReference } from "@/lib/engine/imagePrompt";
 
 export interface SessionView {
   state: StoryState;
@@ -37,6 +38,7 @@ export class StorySession {
   private generation = 0;
   private timer?: ReturnType<typeof setTimeout>;
   private referenceUrl?: string;
+  private characterReferences = new Map<string, { url: string; page: AdventurePage }>();
   private imageJobs = new Set<Promise<void>>();
   private imageControllers = new Set<AbortController>();
   private videoJobs = 0;
@@ -257,7 +259,7 @@ export class StorySession {
       if (!current()) return;
       display(turn);
       page.scene = turn.imagePrompt ?? undefined;
-      if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt);
+      if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt, turn.motionPrompt ?? undefined);
       schedule();
       // Generate one page ahead while the current narration is playing.
       this.warmup();
@@ -273,30 +275,55 @@ export class StorySession {
       if (current() && (e as Error).name !== "AbortError") { controller.abort(); this.discardPrefetch(); this.view.error = (e as Error).message; this.view.status = "Let’s try that again"; this.emit(); }
     }
   }
-  private illustrate(page: AdventurePage, scene: string) {
+  private illustrationReferences(scene: string): ImageReference[] {
+    const references: ImageReference[] = [];
+    for (const name of charactersInScene(scene, this.view.state.characters)) {
+      const anchor = this.characterReferences.get(name);
+      if (!anchor || this.abandonedPages.has(anchor.page)) continue;
+      let reference = references.find(item => item.url === anchor.url);
+      if (!reference) {
+        reference = { url: anchor.url, characters: [] };
+        references.push(reference);
+      }
+      reference.characters.push(name);
+    }
+    // fal's multi-reference editor accepts at most four pictures. Keep room for the last page.
+    const selected = references.filter(item => item.url !== this.referenceUrl).slice(0, this.referenceUrl ? 3 : 4);
+    if (this.referenceUrl) {
+      selected.push(references.find(item => item.url === this.referenceUrl) ?? { url: this.referenceUrl, characters: [] });
+    }
+    return selected;
+  }
+  private illustrate(page: AdventurePage, scene: string, motion?: string) {
     const controller = new AbortController();
     this.imageControllers.add(controller);
     this.view.imageBusy = true; this.emit();
+    const references = this.illustrationReferences(scene);
+    const visibleCharacters = charactersInScene(scene, this.view.state.characters);
     const job = (async () => {
       try {
-        const data = await post<{ url: string; dataUri: string }>("/api/image", { scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, referenceUrl: this.referenceUrl }, controller.signal);
+        const data = await post<{ url: string; dataUri: string }>("/api/image", { scene, artStyle: this.view.state.story.artStyle, characters: this.view.state.characters, references }, controller.signal);
         if (this.closed || this.abandonedPages.has(page)) return;
         const image = await (await fetch(data.dataUri)).blob();
         if (this.closed || this.abandonedPages.has(page)) return;
         page.image = image;
         page.video = undefined;
+        for (const name of visibleCharacters) {
+          const existing = this.characterReferences.get(name);
+          if (!existing || this.abandonedPages.has(existing.page)) this.characterReferences.set(name, { url: data.url, page });
+        }
         if (this.view.pages.at(-1) === page) this.referenceUrl = data.url;
-        this.animate(image, data.url, scene);
+        this.animate(image, data.url, scene, motion);
       } catch (e) { if (!this.closed && (e as Error).name !== "AbortError") this.view.error = `Illustration: ${(e as Error).message}`; }
     })();
     this.imageJobs.add(job);
     void job.finally(() => { this.imageJobs.delete(job); this.imageControllers.delete(controller); this.view.imageBusy = this.imageJobs.size > 0; this.emit(); });
   }
-  private animate(image: Blob, imageUrl: string, scene: string) {
+  private animate(image: Blob, imageUrl: string, scene: string, motion?: string) {
     const controller = new AbortController();
     this.imageControllers.add(controller);
     this.videoJobs++; this.view.videoBusy = true; this.emit();
-    void animateScene(imageUrl, scene, controller.signal)
+    void animateScene(imageUrl, scene, motion, controller.signal)
       .then(video => {
         if (!video || this.closed) return;
         // Later pages that reuse this picture should move too.

@@ -3,7 +3,7 @@ import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
 import { falQueueResult, falQueueStatus, falQueueSubmit, VIDEO_MODEL } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
 
-const Body = z.object({ imageUrl: z.string().url(), scene: z.string().trim().min(1).max(800) });
+const Body = z.object({ imageUrl: z.string().url(), scene: z.string().trim().min(1).max(800), motion: z.string().trim().max(300).optional() });
 const FAL_MEDIA_HOST = /(^|\.)fal\.media$/;
 const REQUEST_ID = /^[0-9a-f-]{36}$/i;
 
@@ -14,15 +14,15 @@ export async function POST(req: Request) {
     if (!parsed.success || !FAL_MEDIA_HOST.test(new URL(parsed.data.imageUrl).hostname)) {
       return Response.json({ error: "Invalid video request" }, { status: 400 });
     }
-    const { imageUrl, scene } = parsed.data;
+    const { imageUrl, scene, motion } = parsed.data;
     const id = await falQueueSubmit(VIDEO_MODEL, {
-      prompt: buildVideoPrompt(scene),
+      prompt: buildVideoPrompt(scene, motion),
       image_url: imageUrl,
       // Matching first and last frames makes the clip loop without a visible jump.
       end_image_url: imageUrl,
       duration: 5,
       resolution: "768P",
-      prompt_expansion_mode: "balanced",
+      prompt_expansion_mode: "disabled",
       enable_safety_checker: true,
     }, req.signal);
     return Response.json({ id });

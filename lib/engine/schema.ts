@@ -26,6 +26,7 @@ export const TurnSchema = z.object({
     .prefault({}),
   advanceBeat: z.boolean().default(false),
   imagePrompt: z.string().trim().max(800).nullish(),
+  motionPrompt: z.string().trim().max(300).nullish(),
   awaitChild: z.boolean().default(false),
   isEnding: z.boolean().default(false),
 });

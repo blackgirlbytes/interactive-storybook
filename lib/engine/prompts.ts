@@ -22,6 +22,7 @@ OUTPUT: respond with ONLY a JSON object, no prose, in exactly this shape:
   },
   "advanceBeat": false,
   "imagePrompt": "visual description of the scene" | null,
+  "motionPrompt": "one small visible action for this picture" | null,
   "awaitChild": false,
   "isEnding": false
 }
@@ -46,6 +47,7 @@ STRUCTURE:
 IMAGES:
 - imagePrompt describes what the picture should show: who is there, where, what they are doing, key objects, mood. No art-style words, no text or letters. Mention characters by name.
 - Provide an imagePrompt on the very first turn, when the beat changes, when the location changes, or when the child changes something visible. Otherwise null.
+- When imagePrompt is present, give motionPrompt as one specific, gentle action a visible character or object can do in a five-second looping clip (for example "Tilly takes two small steps and her scarf flutters"). Keep the camera still. No speech, text, new objects, or scene changes. When imagePrompt is null, motionPrompt is null.
 
 TURN-TAKING:
 - awaitChild: in PLAY mode, set true when your last segment invites the child to respond (do this about every 2-3 turns, for example "What do you think Hare should do?" or a character asking the child a question). In LISTEN mode it is always false and you never ask the child questions.`;

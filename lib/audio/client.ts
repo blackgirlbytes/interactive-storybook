@@ -208,8 +208,8 @@ const VIDEO_POLL_MS = 3000;
 const VIDEO_TIMEOUT_MS = 5 * 60_000;
 
 /** Turns a finished picture into a looping clip. Resolves undefined when clips are turned off. */
-export async function animateScene(imageUrl: string, scene: string, signal: AbortSignal): Promise<Blob | undefined> {
-  const job = await post<{ id?: string; disabled?: boolean }>("/api/video", { imageUrl, scene }, signal);
+export async function animateScene(imageUrl: string, scene: string, motion: string | undefined, signal: AbortSignal): Promise<Blob | undefined> {
+  const job = await post<{ id?: string; disabled?: boolean }>("/api/video", { imageUrl, scene, motion }, signal);
   if (job.disabled || !job.id) return undefined;
   const deadline = Date.now() + VIDEO_TIMEOUT_MS;
   while (Date.now() < deadline) {

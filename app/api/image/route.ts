@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { buildImagePrompt } from "@/lib/engine/imagePrompt";
+import { buildImagePrompt, buildReferencePrompt } from "@/lib/engine/imagePrompt";
 import { falImage } from "@/lib/server/fal";
 import { errorResponse } from "@/lib/server/errors";
 
@@ -7,7 +7,7 @@ const Body = z.object({
   scene: z.string().trim().min(1).max(800),
   artStyle: z.string().max(500),
   characters: z.array(z.object({ name: z.string().max(60), look: z.string().max(400) })).max(12),
-  referenceUrl: z.string().url().optional(),
+  references: z.array(z.object({ url: z.string().url(), characters: z.array(z.string().max(60)).max(12) })).max(4).optional(),
 });
 
 const FAL_MEDIA_HOST = /(^|\.)fal\.media$/;
@@ -24,18 +24,38 @@ export async function POST(req: Request) {
   try {
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) return Response.json({ error: "Invalid image request" }, { status: 400 });
-    const { scene, artStyle, characters, referenceUrl } = parsed.data;
+    const { scene, artStyle, characters } = parsed.data;
     const prompt = buildImagePrompt(scene, artStyle, characters);
 
     let url: string | undefined;
-    const ref = referenceUrl && FAL_MEDIA_HOST.test(new URL(referenceUrl).hostname) ? referenceUrl : undefined;
-    if (ref) {
+    const references = (parsed.data.references ?? []).filter(reference => FAL_MEDIA_HOST.test(new URL(reference.url).hostname));
+    if (references.length > 1) {
+      try {
+        url = await falImage(
+          "fal-ai/flux-2/edit",
+          {
+            prompt: buildReferencePrompt(prompt, references, characters),
+            image_urls: references.map(reference => reference.url),
+            image_size: "landscape_4_3",
+            enable_prompt_expansion: false,
+            enable_safety_checker: true,
+            output_format: "jpeg",
+          },
+          req.signal,
+        );
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") throw e;
+        console.warn("Multi-reference illustration failed, trying one reference:", e);
+      }
+    }
+    if (!url && references.length) {
+      const ref = references.at(-1)!;
       try {
         url = await falImage(
           "fal-ai/flux-kontext/dev",
           {
-            prompt: `Keep the same art style and the same character designs as the reference picture. Draw this new moment: ${prompt}`,
-            image_url: ref,
+            prompt: buildReferencePrompt(prompt, [ref], characters),
+            image_url: ref.url,
             resolution_mode: "4:3",
             num_inference_steps: 20,
             enable_safety_checker: true,
@@ -45,7 +65,7 @@ export async function POST(req: Request) {
         );
       } catch (e) {
         if (e instanceof Error && e.name === "AbortError") throw e;
-        console.warn("Kontext failed, falling back to schnell:", e);
+        console.warn("Referenced illustration failed, falling back to schnell:", e);
       }
     }
     url ??= await falImage(
