@@ -11,6 +11,7 @@ import { standardArtUrl } from "@/lib/stories/standardArt";
 import { charactersInScene, type ImageReference } from "@/lib/engine/imagePrompt";
 
 const CHILD_REPLY_WAIT_MS = 8000;
+const AUTO_CONTINUE_MS = 500;
 
 export interface SessionView {
   state: StoryState;
@@ -72,7 +73,7 @@ export class StorySession {
   }
   private emit() { if (!this.closed) this.update({ ...this.view, pages: [...this.view.pages] }); }
   warmup() {
-    if (!this.closed && !this.prefetched && this.view.state.mode === "listen" && !this.view.state.ended) {
+    if (!this.closed && !this.prefetched && !this.view.state.ended) {
       this.prefetched = this.prepare(this.view.state);
     }
   }
@@ -195,7 +196,7 @@ export class StorySession {
     }
     this.emit();
     if (wasAwaitingChild && mode === "listen" && !this.view.state.ended) {
-      this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
+      this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, AUTO_CONTINUE_MS);
     }
     if (mode === "play") {
       const mic = this.mic = new Microphone(storyLanguage(this.view.state.story));
@@ -271,7 +272,7 @@ export class StorySession {
         this.pendingPage = undefined;
         this.activeNarration = undefined;
         this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : "Ready for the next page"; this.emit();
-        if (!this.view.state.ended) this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, 1200);
+        if (!this.view.state.ended) this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, AUTO_CONTINUE_MS);
         return;
       }
       this.pendingPage = undefined;
@@ -281,7 +282,13 @@ export class StorySession {
       this.prefetched = undefined;
       controller = this.controller = prepared.controller;
       const previous = this.view.pages.at(-1);
-      const page: AdventurePage = { segments: [], audio: [], image: previous?.image, video: previous?.video };
+      const readyArt = !text && !this.customized && !base.plotNotes.length &&
+        !base.characters.some(character => character.invented)
+        ? standardArtUrl(base.story, base.beatIndex) : undefined;
+      const page: AdventurePage = {
+        segments: [], audio: [], image: readyArt ? undefined : previous?.image,
+        video: undefined, standardArtUrl: readyArt,
+      };
       const active: ActiveNarration = { base, page, heardCount: 0, referenceUrl: this.referenceUrl };
       this.activeNarration = active;
       let attached = false;
@@ -334,7 +341,7 @@ export class StorySession {
       if (standardUrl && !changedStory) this.illustrateStandard(page, standardUrl, turn.imagePrompt ?? base.story.beats[base.beatIndex].goal, turn.motionPrompt ?? undefined);
       else if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt, turn.motionPrompt ?? undefined, base.beatIndex);
       schedule();
-      // Generate one page ahead while the current narration is playing.
+      // Prepare the next text and voice while this page plays. A child's answer discards it.
       this.warmup();
       await playback;
       if (!current()) return;
@@ -343,7 +350,7 @@ export class StorySession {
       this.view.status = this.view.state.ended ? "The End. What a lovely adventure!" : turn.awaitChild ? "What happens next? Tell me!" : "A little more magic…"; this.emit();
       if (!this.view.state.ended) {
         this.awaitingChild = turn.awaitChild && this.view.state.mode === "play";
-        this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, this.awaitingChild ? CHILD_REPLY_WAIT_MS : 1200);
+        this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, this.awaitingChild ? CHILD_REPLY_WAIT_MS : AUTO_CONTINUE_MS);
       }
     } catch (e) {
       if (current() && (e as Error).name !== "AbortError") { controller.abort(); this.discardPrefetch(); this.view.error = (e as Error).message; this.view.status = "Let’s try that again"; this.emit(); }

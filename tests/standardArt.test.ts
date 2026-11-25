@@ -67,6 +67,22 @@ describe("standard story illustrations", () => {
     session.close();
   });
 
+  it("shows the fixed picture as soon as the first line arrives", async () => {
+    let finish!: (value: typeof turn) => void;
+    mocks.streamTurn.mockImplementation((_state, _signal, onSegment) => {
+      onSegment(turn.segments[0]);
+      return new Promise(resolve => { finish = resolve; });
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["picture"], { type: "image/jpeg" }))));
+    const session = new StorySession(story, () => {});
+    const pending = session.turn();
+    await vi.waitFor(() => expect(session.view.pages).toHaveLength(1));
+    expect(session.view.pages[0].standardArtUrl).toBe("/story-art/tortoise-and-hare/beat-0.jpg");
+    finish(turn);
+    await pending;
+    session.close();
+  });
+
   it("reuses a fixed picture and its animation across turns in the same beat", async () => {
     mocks.streamTurn.mockResolvedValue(turn);
     mocks.speechAudio.mockImplementation(() => ({ blob: Promise.resolve(new Blob(["audio"])), play: async () => {} }));

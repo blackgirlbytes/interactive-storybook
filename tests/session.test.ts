@@ -43,7 +43,7 @@ describe("session lifecycle", () => {
     onSpeechStart();
     await firstTurn;
     await s.turn("Give the dragon a balloon instead");
-    const nextState = mocks.streamTurn.mock.calls[1][0];
+    const nextState = mocks.streamTurn.mock.calls.find(([state]) => state.log.at(-1)?.kind === "child")![0];
     expect(nextState.log.map((entry: { text: string }) => entry.text)).toEqual([
       "The dragon found a silver key.",
       "Give the dragon a balloon instead",
@@ -65,7 +65,7 @@ describe("session lifecycle", () => {
     onSpeechStart();
     await firstTurn;
     await s.turn("Make the hero a dragon");
-    const nextState = mocks.streamTurn.mock.calls[1][0];
+    const nextState = mocks.streamTurn.mock.calls.find(([state]) => state.log.at(-1)?.kind === "child")![0];
     expect(nextState.log.map((entry: { text: string }) => entry.text)).toEqual(["Make the hero a dragon"]);
     expect(s.view.pages).toHaveLength(1);
     s.close();
@@ -86,7 +86,7 @@ describe("session lifecycle", () => {
   it("automatically progresses in listen mode and stops on pause", async () => {
     const s = new StorySession(story,()=>{});
     await s.turn();
-    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(500);
     expect(s.view.pages).toHaveLength(2);
     expect(mocks.streamTurn).toHaveBeenCalledTimes(3);
     s.pauseNarrator();
@@ -100,9 +100,9 @@ describe("session lifecycle", () => {
     await s.turn();
     expect(s.view.status).toBe("What happens next? Tell me!");
     await vi.advanceTimersByTimeAsync(7999);
-    expect(mocks.streamTurn).toHaveBeenCalledTimes(1);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(2); // the next page is ready in the background
     await vi.advanceTimersByTimeAsync(1);
-    expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(3); // only the following page needs a new request
     expect(s.view.pages).toHaveLength(2);
     s.close();
   });
@@ -113,11 +113,26 @@ describe("session lifecycle", () => {
     const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
     onSpeechStart();
     await vi.advanceTimersByTimeAsync(8000);
-    expect(mocks.streamTurn).toHaveBeenCalledTimes(1);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
     const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
     onFinal("The tortoise finds a bicycle");
-    await vi.waitFor(() => expect(mocks.streamTurn).toHaveBeenCalledTimes(2));
-    expect(mocks.streamTurn.mock.calls[1][0].log.at(-1).text).toBe("The tortoise finds a bicycle");
+    await vi.waitFor(() => expect(mocks.streamTurn.mock.calls.some(([state]) => state.log.at(-1)?.text === "The tortoise finds a bicycle")).toBe(true));
+    s.close();
+  });
+  it("discards the prepared page when a child answers just before the timeout", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    await s.turn();
+    const unused = mocks.streamTurn.mock.calls[1][1] as AbortSignal;
+    await vi.advanceTimersByTimeAsync(7999);
+    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
+    onSpeechStart();
+    const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
+    onFinal("The hare finds a bicycle");
+    await vi.waitFor(() => expect(mocks.streamTurn.mock.calls.some(([state]) =>
+      state.log.at(-1)?.text === "The hare finds a bicycle")).toBe(true));
+    expect(unused.aborted).toBe(true);
+    expect(s.view.state.log.some(entry => entry.kind === "child" && entry.text === "The hare finds a bicycle")).toBe(true);
     s.close();
   });
   it("cancels the unanswered question timer when paused", async () => {
@@ -126,7 +141,7 @@ describe("session lifecycle", () => {
     await s.turn();
     s.pauseNarrator();
     await vi.advanceTimersByTimeAsync(8000);
-    expect(mocks.streamTurn).toHaveBeenCalledTimes(1);
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
     s.close();
   });
   it("uses the shorter automatic wait when switching from Play & talk to Listen", async () => {
@@ -134,7 +149,7 @@ describe("session lifecycle", () => {
     await s.mode("play");
     await s.turn();
     await s.mode("listen");
-    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(500);
     expect(s.view.pages).toHaveLength(2);
     s.close();
   });
@@ -176,7 +191,7 @@ describe("session lifecycle", () => {
     expect(mocks.micStart).toHaveBeenCalledTimes(2);
     expect(s.view.listening).toBe(true);
     expect(s.view.pauseMode).toBe("none");
-    expect(mocks.streamTurn).toHaveBeenCalledOnce();
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
     s.close();
   });
   it("keeps what the child was saying when everything is paused", async () => {
@@ -186,7 +201,7 @@ describe("session lifecycle", () => {
     s.pauseAll();
     expect(mocks.streamTurn).not.toHaveBeenCalled();
     await s.resume();
-    expect(mocks.streamTurn).toHaveBeenCalledOnce();
+    expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
     const sentState = mocks.streamTurn.mock.calls[0][0];
     expect(sentState.log.at(-1)).toMatchObject({ kind: "child", text: "The tortoise has roller skates" });
     s.close();
