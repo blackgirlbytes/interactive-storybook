@@ -1,0 +1,71 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M88813TG7RVQP5NYB0VFQA27",
+  "session_id": "01a2107b-48f1-7b03-82b7-b54e271b32a3",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T02:19:51.763416Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "lib/stories/index.ts",
+    "public/story-art/little-red-riding-hood/beat-0.jpg",
+    "public/story-art/little-red-riding-hood/beat-1.jpg",
+    "public/story-art/little-red-riding-hood/beat-2.jpg",
+    "public/story-art/little-red-riding-hood/beat-3.jpg",
+    "public/story-art/little-red-riding-hood/beat-4.jpg",
+    "public/story-art/noahs-ark/beat-0.jpg",
+    "public/story-art/noahs-ark/beat-1.jpg",
+    "public/story-art/noahs-ark/beat-2.jpg",
+    "public/story-art/noahs-ark/beat-3.jpg",
+    "public/story-art/noahs-ark/beat-4.jpg",
+    "public/story-art/noahs-ark/beat-5.jpg",
+    "public/story-art/three-little-pigs/beat-0.jpg",
+    "public/story-art/three-little-pigs/beat-1.jpg",
+    "public/story-art/three-little-pigs/beat-2.jpg",
+    "public/story-art/three-little-pigs/beat-3.jpg",
+    "public/story-art/three-little-pigs/beat-4.jpg",
+    "public/story-art/tortoise-and-hare/beat-0.jpg",
+    "public/story-art/tortoise-and-hare/beat-1.jpg",
+    "public/story-art/tortoise-and-hare/beat-2.jpg",
+    "public/story-art/tortoise-and-hare/beat-3.jpg",
+    "public/story-art/tortoise-and-hare/beat-4.jpg",
+    "scripts/generate-story-art.cjs",
+    "scripts/story-art-scenes.json"
+  ],
+  "agent": "Codex",
+  "model": "gpt-6-sol",
+  "turn_id": "0c19606074ba",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 515104,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 39077632,
+    "output_tokens": 102413,
+    "api_call_count": 25
+  },
+  "session_token_usage": {
+    "input_tokens": 515104,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 39077632,
+    "output_tokens": 102413,
+    "api_call_count": 25
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 2
+  }
+}
