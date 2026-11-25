@@ -3,7 +3,7 @@
   "checkpoint_id": "01M88813TG7RVQP5NYB0VFQA27",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 4,
+  "checkpoints_count": 6,
   "files_touched": [
     "lib/stories/index.ts",
     "public/story-art/little-red-riding-hood/beat-0.jpg",
@@ -44,25 +44,32 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 555974,
-    "cache_creation_tokens": 0,
-    "cache_read_tokens": 40314368,
-    "output_tokens": 109538,
-    "api_call_count": 35
+    "input_tokens": 556040,
+    "cache_creation_tokens": 55972,
+    "cache_read_tokens": 50179656,
+    "output_tokens": 134170,
+    "api_call_count": 64
   },
   "redaction": {
-    "replacements": 24,
+    "replacements": 88,
     "layers": {
       "betterleaks": 3,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 3,
       "credentialed_uri": 0,
-      "entropy": 23,
-      "key_context": 0,
+      "entropy": 81,
+      "key_context": 6,
       "provider_token": 0,
       "shell_stdin": 0
     }
