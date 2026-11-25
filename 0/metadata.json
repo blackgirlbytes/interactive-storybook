@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.13.4",
+  "checkpoint_id": "01M88KE05MV1QFH3CZWARVV6E9",
+  "session_id": "01a21111-fc19-7383-a8c8-d36bcb713386",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-25T05:39:07.391725Z",
+  "branch": "codex/storybook-updates-review",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/api/video/route.ts",
+    "lib/engine/videoPrompt.ts",
+    "scripts/generate-story-video.mjs",
+    "tests/visuals.test.ts"
+  ],
+  "agent": "Codex",
+  "model": "gpt-6-sol",
+  "turn_id": "1edba8016a89",
+  "checkpoint_transcript_start": 1485,
+  "transcript_lines_at_start": 1485,
+  "compact_transcript_start": 292,
+  "token_usage": {
+    "input_tokens": 3365,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 793984,
+    "output_tokens": 3004,
+    "api_call_count": 6
+  },
+  "session_token_usage": {
+    "input_tokens": 186946,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 15101952,
+    "output_tokens": 48024,
+    "api_call_count": 192,
+    "subagent_tokens": {
+      "input_tokens": 183358,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 7204736,
+      "output_tokens": 37133,
+      "api_call_count": 124
+    },
+    "subagent_tokens_complete": true
+  },
+  "redaction": {
+    "replacements": 1278,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 1593,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 4
+  }
+}
