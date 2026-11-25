@@ -200,7 +200,7 @@ export class Microphone {
   private draining = false;
   private finalDuringDrain = "";
 
-  async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void, onSpeechStart?: () => void) {
+  async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone needs HTTPS or localhost and a supported browser.");
     // Flux accepts Opus in WebM or Ogg containers; other recorder formats would be rejected.
     const mimeType = typeof MediaRecorder !== "undefined" && ["audio/webm;codecs=opus", "audio/ogg;codecs=opus"].find(t => MediaRecorder.isTypeSupported(t));
@@ -239,7 +239,6 @@ export class Microphone {
         this.inTurn = true;
         if (text) this.turnText = text;
         if (this.ending) return;
-        if (msg.event === "StartOfTurn") onSpeechStart?.();
         if (text) onInterim(text);
       };
       socket.onclose = () => {
