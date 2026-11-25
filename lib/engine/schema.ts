@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { MOODS } from "@/lib/audio/expression";
 
 const shortText = (max: number) => z.string().trim().min(1).max(max);
 
 export const TurnSchema = z.object({
   segments: z
-    .array(z.object({ speaker: shortText(60), text: shortText(600) }))
+    .array(z.object({ speaker: shortText(60), text: shortText(600), mood: z.enum(MOODS).optional().catch(undefined) }))
     .min(1)
     .max(6),
   stateChanges: z

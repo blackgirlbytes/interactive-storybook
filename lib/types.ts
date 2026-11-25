@@ -1,3 +1,6 @@
+import type { LanguageCode } from "@/lib/languages";
+import type { Mood } from "@/lib/audio/expression";
+
 export type Category = "fairy-tale" | "bible" | "fable" | "custom";
 
 export interface CharacterCard {
@@ -25,6 +28,8 @@ export interface StoryDef {
   narratorVoice: string;
   characters: CharacterCard[];
   beats: Beat[];
+  /** Spoken language of the story. Missing means English (stories saved before languages existed). */
+  language?: LanguageCode;
 }
 
 export type LogKind = "narration" | "dialogue" | "child";
@@ -55,4 +60,6 @@ export interface SpokenSegment {
   speakerName: string;
   voice: string;
   text: string;
+  /** How the line was performed; missing on pages saved before moods existed. */
+  mood?: Mood;
 }

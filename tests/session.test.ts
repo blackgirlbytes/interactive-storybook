@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLASSIC_STORIES } from "@/lib/stories";
-const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn(), micStart:vi.fn(), micStop:vi.fn(), micFinish:vi.fn() }));
+const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn(), audioDuration:vi.fn(), micStart:vi.fn(), micStop:vi.fn(), micFinish:vi.fn() }));
 vi.mock("@/lib/audio/client", () => ({ ...mocks, Microphone: class { start = mocks.micStart; stop = mocks.micStop; finish = mocks.micFinish; } }));
 import { StorySession } from "@/lib/audio/session";
 const story = CLASSIC_STORIES[2];

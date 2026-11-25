@@ -1,6 +1,7 @@
 import type { CharacterCard, LogEntry, Mode, SpokenSegment, StoryDef, StoryState } from "@/lib/types";
 import type { Turn } from "@/lib/engine/schema";
 import { normalizeVoice, pickUnusedVoice } from "@/lib/voices";
+import { storyLanguage } from "@/lib/languages";
 
 const MAX_NOTES = 30;
 const MAX_OBJECTS = 20;
@@ -23,8 +24,10 @@ export function initialState(story: StoryDef, mode: Mode): StoryState {
 export function slugify(name: string): string {
   return (
     name
+      .normalize("NFC")
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
+      // Keep letters from every script so names like "ゆき" or "Маша" still get distinct ids.
+      .replace(/[^\p{L}\p{M}\p{N}]+/gu, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 40) || "friend"
   );
@@ -53,9 +56,10 @@ function mergeCharacters(state: StoryState, turn: Turn): CharacterCard[] {
     if (findCharacter(characters, add.name)) continue;
     let id = slugify(add.name);
     while (characters.some((c) => c.id === id)) id += "-2";
-    const used = [state.story.narratorVoice, ...characters.map((c) => c.voice)].map((v) => normalizeVoice(v) ?? v);
-    const requested = normalizeVoice(add.voice);
-    const voice = requested && !used.includes(requested) ? requested : pickUnusedVoice(used);
+    const language = storyLanguage(state.story);
+    const used = [state.story.narratorVoice, ...characters.map((c) => c.voice)].map((v) => normalizeVoice(v, language) ?? v);
+    const requested = normalizeVoice(add.voice, language);
+    const voice = requested && !used.includes(requested) ? requested : pickUnusedVoice(used, language);
     characters.push({ id, name: add.name, personality: add.personality, look: add.look, voice, invented: true });
   }
   return characters;
@@ -85,8 +89,8 @@ export function applyTurn(state: StoryState, turn: Turn): AppliedTurn {
   const spoken: SpokenSegment[] = turn.segments.map((seg) => {
     const ch = findCharacter(characters, seg.speaker);
     return ch
-      ? { speakerId: ch.id, speakerName: ch.name, voice: ch.voice, text: seg.text }
-      : { speakerId: "narrator", speakerName: "Narrator", voice: state.story.narratorVoice, text: seg.text };
+      ? { speakerId: ch.id, speakerName: ch.name, voice: ch.voice, text: seg.text, mood: seg.mood }
+      : { speakerId: "narrator", speakerName: "Narrator", voice: state.story.narratorVoice, text: seg.text, mood: seg.mood };
   });
 
   const newEntries: LogEntry[] = spoken.map((s) => ({

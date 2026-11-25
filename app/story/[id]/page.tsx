@@ -6,7 +6,7 @@ async function Story({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const story = getClassicStory(id);
   if (!story) notFound();
-  return <StoryPlayer story={story}/>;
+  return <StoryPlayer story={story} chooseLanguage/>;
 }
 export default function Page(props: { params: Promise<{ id: string }> }) {
   return <Suspense fallback={<main className="reader">Opening your story…</main>}><Story {...props}/></Suspense>;

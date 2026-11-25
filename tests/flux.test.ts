@@ -66,7 +66,7 @@ describe("Flux TTS route", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("audio/mpeg");
     expect(await res.text()).toBe("audio");
-    expect(fetchMock).toHaveBeenCalledWith("https://api.deepgram.com/v2/speak?model=flux-hannah-en&encoding=mp3", expect.objectContaining({ body: JSON.stringify({ text: "Once upon a time." }) }));
+    expect(fetchMock).toHaveBeenCalledWith("https://api.deepgram.com/v2/speak?model=flux-hannah-en&encoding=mp3&expressivity=1", expect.objectContaining({ body: JSON.stringify({ text: "Once upon a time." }) }));
   });
   it("rejects unsupported voices without contacting Deepgram", async () => {
     const res = await POST(new Request("http://localhost/api/tts", { method: "POST", body: JSON.stringify({ text: "Hello.", voice: "unknown" }) }));

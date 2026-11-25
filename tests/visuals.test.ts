@@ -3,7 +3,7 @@ import { CLASSIC_STORIES } from "@/lib/stories";
 import { buildImagePrompt, buildReferencePrompt, charactersInScene } from "@/lib/engine/imagePrompt";
 import { buildVideoPrompt } from "@/lib/engine/videoPrompt";
 
-const mocks = vi.hoisted(() => ({ post: vi.fn(), streamTurn: vi.fn(), speechAudio: vi.fn(), animateScene: vi.fn(), falImage: vi.fn(), falQueueSubmit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ post: vi.fn(), streamTurn: vi.fn(), speechAudio: vi.fn(), animateScene: vi.fn(), audioDuration: vi.fn(), falImage: vi.fn(), falQueueSubmit: vi.fn() }));
 vi.mock("@/lib/audio/client", () => ({
   ...mocks,
   Microphone: class { start = vi.fn().mockResolvedValue(undefined); stop = vi.fn(); },

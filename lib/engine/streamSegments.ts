@@ -1,8 +1,10 @@
 import { TurnSchema, type Turn } from "@/lib/engine/schema";
+import type { Mood } from "@/lib/audio/expression";
 
 export interface StreamedSegment {
   speaker: string;
   text: string;
+  mood?: Mood;
 }
 
 export type TurnEvent =

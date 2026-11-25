@@ -2,7 +2,9 @@ import type { Mode, StoryDef, StoryState } from "@/lib/types";
 import { initialState, applyTurn, addChildUtterance, findCharacter } from "@/lib/engine/reducer";
 import { TurnSchema, type Turn } from "@/lib/engine/schema";
 import type { StreamedSegment } from "@/lib/engine/streamSegments";
-import { animateScene, Microphone, playBlob, post, speech, speechAudio, streamTurn, type SpeechAudio } from "./client";
+import { animateScene, audioDuration, Microphone, playBlob, post, speech, speechAudio, streamTurn, type OnTime, type SpeechAudio } from "./client";
+import { storyLanguage } from "@/lib/languages";
+import { WordClock } from "@/lib/text/wordClock";
 import type { AdventurePage } from "@/lib/db";
 import { isLikelyEcho } from "@/lib/engine/echo";
 import { charactersInScene, type ImageReference } from "@/lib/engine/imagePrompt";
@@ -16,6 +18,13 @@ export interface SessionView {
   pauseMode: "none" | "narrator" | "all";
   imageBusy: boolean;
   videoBusy: boolean;
+  /** The word being read aloud right now, for read-along highlighting. */
+  reading?: ReadingPosition;
+}
+export interface ReadingPosition {
+  page: AdventurePage;
+  segment: number;
+  word: number;
 }
 interface PreparedTurn {
   state: StoryState;
@@ -54,7 +63,7 @@ export class StorySession {
   private lastWords?: Promise<void>;
   private prefetched?: PreparedTurn;
   constructor(story: StoryDef, private update: (view: SessionView) => void, restored?: SessionView) {
-    this.view = restored ? { ...restored, listening: false, pauseMode: "none", imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, pauseMode: "none", imageBusy: false, videoBusy: false };
+    this.view = restored ? { ...restored, reading: undefined, listening: false, pauseMode: "none", imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, pauseMode: "none", imageBusy: false, videoBusy: false };
   }
   private emit() { if (!this.closed) this.update({ ...this.view, pages: [...this.view.pages] }); }
   warmup() {
@@ -72,14 +81,14 @@ export class StorySession {
       const character = findCharacter(state.characters, segment.speaker);
       // New characters need the final metadata before choosing their own voice.
       prepared.audio.push(segment.speaker === "narrator" || character
-        ? speechAudio(segment.text, character?.voice ?? state.story.narratorVoice, controller.signal)
+        ? speechAudio(segment.text, character?.voice ?? state.story.narratorVoice, controller.signal, segment.mood)
         : undefined);
       prepared.notify?.();
     }).then(turn => {
       const spoken = applyTurn(state, turn).spoken;
       prepared.segments = turn.segments;
       spoken.forEach((segment, i) => {
-        prepared.audio[i] ??= speechAudio(segment.text, segment.voice, controller.signal);
+        prepared.audio[i] ??= speechAudio(segment.text, segment.voice, controller.signal, segment.mood);
       });
       return turn;
     });
@@ -105,6 +114,11 @@ export class StorySession {
     this.view.pauseMode = "all";
     this.view.status = "Story and microphone paused";
     this.emit();
+  }
+  /** Silences the story so a word can be sounded out; the mic goes off too so it can't hear the sounds as a reply. */
+  quiet() {
+    if (this.view.listening) this.pauseAll();
+    else if (this.view.pauseMode === "none") this.pauseNarrator();
   }
   /** Turns the mic off, keeping a half-finished idea as story input for when the story resumes. */
   private async keepLastWords(mic: Microphone) {
@@ -170,7 +184,7 @@ export class StorySession {
     }
     this.emit();
     if (mode === "play") {
-      const mic = this.mic = new Microphone();
+      const mic = this.mic = new Microphone(storyLanguage(this.view.state.story));
       try {
         await mic.start(
           text => { if (!this.closed && this.mic === mic && !this.echo(text)) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
@@ -189,9 +203,27 @@ export class StorySession {
       this.emit();
     }
   }
+  /** Follows a segment's playback and moves the read-along highlight from word to word. */
+  private follow(page: AdventurePage, segment: number, recording: Blob | Promise<Blob>): OnTime {
+    const clock = new WordClock(page.segments[segment]?.text ?? "");
+    void Promise.resolve(recording).then(audioDuration).then(seconds => { if (seconds > 0) clock.duration = seconds; }).catch(() => {});
+    return seconds => {
+      if (this.closed) return;
+      const word = clock.wordAt(seconds);
+      const now = this.view.reading;
+      if (now?.page === page && now.segment === segment && now.word === word) return;
+      this.view.reading = { page, segment, word };
+      this.emit();
+    };
+  }
+  private stopFollowing(page: AdventurePage, segment: number) {
+    if (this.view.reading?.page !== page || this.view.reading.segment !== segment) return;
+    this.view.reading = undefined;
+    this.emit();
+  }
   private echo(text: string) { return Date.now() - this.spokenAt < 15000 && isLikelyEcho(text, this.recentlySpoken); }
   private async narrate(page: AdventurePage, controller: AbortController, current: () => boolean) {
-    const loads = page.segments.map((s,i) => page.audio[i] ? Promise.resolve(page.audio[i]) : speech(s.text, s.voice, controller.signal));
+    const loads = page.segments.map((s,i) => page.audio[i] ? Promise.resolve(page.audio[i]) : speech(s.text, s.voice, controller.signal, "story", s.mood));
     loads.forEach(p => { void p.catch(() => {}); });
     for (let i = 0; i < loads.length; i++) {
       const blob = await loads[i];
@@ -199,7 +231,8 @@ export class StorySession {
       page.audio[i] = blob;
       this.recentlySpoken = page.segments[i].text; this.spokenAt = Date.now() + page.segments[i].text.length * 90;
       this.view.status = `${page.segments[i].speakerName} is speaking`; this.emit();
-      await playBlob(blob, controller.signal);
+      try { await playBlob(blob, controller.signal, this.follow(page, i, blob)); }
+      finally { this.stopFollowing(page, i); }
       if (current() && this.activeNarration?.page === page) this.activeNarration.heardCount = Math.max(this.activeNarration.heardCount, i + 1);
       this.spokenAt = Date.now();
     }
@@ -256,7 +289,8 @@ export class StorySession {
             const segment = page.segments[i];
             this.recentlySpoken = segment.text; this.spokenAt = Date.now() + segment.text.length * 90;
             this.view.status = `${segment.speakerName} is speaking`; this.emit();
-            await resource.play();
+            try { await resource.play(this.follow(page, i, resource.blob)); }
+            finally { this.stopFollowing(page, i); }
             if (!current()) return;
             active.heardCount = Math.max(active.heardCount, i + 1);
             page.audio[i] = await resource.blob;
@@ -360,7 +394,7 @@ export class StorySession {
         for (let i = 0; i < page.segments.length; i++) {
           if (!page.audio[i]) {
             const s = page.segments[i];
-            page.audio[i] = await speech(s.text, s.voice, AbortSignal.timeout(30000));
+            page.audio[i] = await speech(s.text, s.voice, AbortSignal.timeout(30000), "story", s.mood);
           }
         }
       }

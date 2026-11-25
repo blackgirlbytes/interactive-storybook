@@ -9,6 +9,12 @@ export async function post<T>(path: string, body: unknown, signal?: AbortSignal)
 
 import { TurnSchema, type Turn } from "@/lib/engine/schema";
 import type { StreamedSegment, TurnEvent } from "@/lib/engine/streamSegments";
+import { DEFAULT_LANGUAGE, listenParams, type LanguageCode } from "@/lib/languages";
+import type { Mood } from "@/lib/audio/expression";
+
+export type SpeechStyle = "story" | "clear";
+/** Called on every animation frame while audio plays, with the playback position in seconds. */
+export type OnTime = (seconds: number) => void;
 
 export async function streamTurn(state: unknown, signal: AbortSignal, onSegment: (segment: StreamedSegment) => void): Promise<Turn> {
   const res = await fetch("/api/turn", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state }), signal });
@@ -45,8 +51,8 @@ export async function streamTurn(state: unknown, signal: AbortSignal, onSegment:
   }
 }
 
-async function speechResponse(text: string, voice: string, signal: AbortSignal): Promise<Response> {
-  const res = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice }), signal });
+async function speechResponse(text: string, voice: string, signal: AbortSignal, style: SpeechStyle = "story", mood?: Mood): Promise<Response> {
+  const res = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice, style, mood }), signal });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || "Couldn't load the voice.");
@@ -54,42 +60,66 @@ async function speechResponse(text: string, voice: string, signal: AbortSignal):
   return res;
 }
 
-export async function speech(text: string, voice: string, signal: AbortSignal): Promise<Blob> {
-  return (await speechResponse(text, voice, signal)).blob();
+export async function speech(text: string, voice: string, signal: AbortSignal, style: SpeechStyle = "story", mood?: Mood): Promise<Blob> {
+  return (await speechResponse(text, voice, signal, style, mood)).blob();
 }
 
 export interface SpeechAudio {
   blob: Promise<Blob>;
-  play: () => Promise<void>;
+  play: (onTime?: OnTime) => Promise<void>;
+}
+
+/** Length of an audio recording in seconds, read from its metadata. */
+export function audioDuration(blob: Blob): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio();
+    audio.preload = "metadata";
+    const done = (value?: number) => { URL.revokeObjectURL(url); audio.removeAttribute("src"); if (value) resolve(value); else reject(new Error("Unknown duration")); };
+    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) ? audio.duration : undefined);
+    audio.onerror = () => done();
+    audio.src = url;
+  });
+}
+
+/** Reports playback position every frame until the returned stop function is called. */
+function trackTime(audio: HTMLAudioElement, onTime?: OnTime): () => void {
+  if (!onTime || typeof requestAnimationFrame === "undefined") return () => {};
+  let frame = 0;
+  const tick = () => { onTime(audio.currentTime); frame = requestAnimationFrame(tick); };
+  frame = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(frame);
 }
 
 /** Download once, play MP3 bytes immediately, and retain the complete recording for saves. */
-export function speechAudio(text: string, voice: string, signal: AbortSignal): SpeechAudio {
-  const response = speechResponse(text, voice, signal);
+export function speechAudio(text: string, voice: string, signal: AbortSignal, mood?: Mood): SpeechAudio {
+  const response = speechResponse(text, voice, signal, "story", mood);
   const blob = response.then(res => res.clone().blob());
   void blob.catch(() => {});
   return {
     blob,
-    async play() {
+    async play(onTime?: OnTime) {
       if (typeof MediaSource === "undefined" || !MediaSource.isTypeSupported("audio/mpeg")) {
-        return playBlob(await blob, signal);
+        return playBlob(await blob, signal, onTime);
       }
-      return playStream(await response, signal);
+      return playStream(await response, signal, onTime);
     },
   };
 }
 
-function playStream(response: Response, signal: AbortSignal): Promise<void> {
+function playStream(response: Response, signal: AbortSignal, onTime?: OnTime): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) return reject(new DOMException("Stopped", "AbortError"));
     const source = new MediaSource();
     const url = URL.createObjectURL(source);
     const audio = new Audio(url);
     const reader = response.body!.getReader();
+    const stopTracking = trackTime(audio, onTime);
     let settled = false;
     const finish = (error?: unknown) => {
       if (settled) return;
       settled = true;
+      stopTracking();
       signal.removeEventListener("abort", abort);
       audio.pause();
       audio.removeAttribute("src");
@@ -132,12 +162,14 @@ function playStream(response: Response, signal: AbortSignal): Promise<void> {
   });
 }
 
-export function playBlob(blob: Blob, signal: AbortSignal): Promise<void> {
+export function playBlob(blob: Blob, signal: AbortSignal, onTime?: OnTime): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) return reject(new DOMException("Stopped", "AbortError"));
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    const stopTracking = trackTime(audio, onTime);
     const finish = (err?: unknown) => {
+      stopTracking();
       audio.pause();
       audio.removeAttribute("src");
       URL.revokeObjectURL(url);
@@ -153,6 +185,7 @@ export function playBlob(blob: Blob, signal: AbortSignal): Promise<void> {
 }
 
 export class Microphone {
+  constructor(private language: LanguageCode = DEFAULT_LANGUAGE) {}
   private stream?: MediaStream;
   private socket?: WebSocket;
   private recorder?: MediaRecorder;
@@ -174,8 +207,7 @@ export class Microphone {
     try {
       const { token } = await post<{ token: string }>("/api/deepgram-token", {});
       if (this.stopped) { this.stop(); return; }
-      // Children often pause mid-idea, so give Flux up to 3 s of silence before it must end the turn.
-      const params = new URLSearchParams({ model: "flux-general-en", eot_threshold: "0.7", eot_timeout_ms: "3000" });
+      const params = listenParams(this.language);
       const socket = this.socket = new WebSocket(`wss://api.deepgram.com/v2/listen?${params}`, ["bearer", token]);
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("Microphone connection timed out.")), 10000);
