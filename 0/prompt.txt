@@ -1,0 +1,6 @@
+lets tackle these two
+
+[**Slop**](https://entire.com/gh/blackgirlbytes/-/agents/01M888J04GRYBY4NAF5EPZP03P)2m ago
+**`StorySession.startMicrophone`** no longer passes the fourth **`onSpeechStart`** argument. **`CreateStory`** never passed it, so the optional parameter and the **`StartOfTurn`** dispatch this Change added to **`Microphone.start`** are now dead code. Remove the parameter and the **`onSpeechStart?.()`** branch.
+[**Slop**](https://entire.com/gh/blackgirlbytes/-/agents/01M888J04GRYBY4NAF5EPZP03P)2h ago
+**`illustrateStandard`** calls **`animate()`** for the shipped, unchanging pictures, so every reading of an unchanged classic submits a new paid fal video job (about $0.09 per beat). The **`/api/video`** route even derives a fixed seed to make those clips repeatable. Since the stills are pre-generated once, ship or cache their loops the same way instead of paying for identical clips each session.
