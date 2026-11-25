@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLASSIC_STORIES } from "@/lib/stories";
-const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn() }));
-vi.mock("@/lib/audio/client", () => ({ ...mocks, Microphone: class { stop() {} } }));
+const mocks = vi.hoisted(() => ({ post:vi.fn(), speech:vi.fn(), playBlob:vi.fn(), speechAudio:vi.fn(), streamTurn:vi.fn(), animateScene:vi.fn(), micStart:vi.fn(), micStop:vi.fn() }));
+vi.mock("@/lib/audio/client", () => ({ ...mocks, Microphone: class { start = mocks.micStart; stop = mocks.micStop; } }));
 import { StorySession } from "@/lib/audio/session";
 const story = CLASSIC_STORIES[2];
 const reply = { segments:[{speaker:"narrator",text:"Once upon a time."}],stateChanges:{},advanceBeat:false,awaitChild:true,isEnding:false };
@@ -10,6 +10,7 @@ beforeEach(() => {
   mocks.streamTurn.mockImplementation(async (_state, _signal, onSegment) => { reply.segments.forEach(onSegment); return reply; });
   mocks.speech.mockResolvedValue(new Blob(["audio"]));
   mocks.playBlob.mockResolvedValue(undefined);
+  mocks.micStart.mockResolvedValue(undefined);
   mocks.speechAudio.mockImplementation((text, voice, signal) => {
     const blob = mocks.speech(text, voice, signal);
     void blob.catch(() => {});
@@ -37,7 +38,7 @@ describe("session lifecycle", () => {
     await vi.advanceTimersByTimeAsync(1200);
     expect(s.view.pages).toHaveLength(2);
     expect(mocks.streamTurn).toHaveBeenCalledTimes(3);
-    s.pause();
+    s.pauseNarrator();
     await vi.advanceTimersByTimeAsync(3000);
     expect(mocks.streamTurn).toHaveBeenCalledTimes(3);
     s.close();
@@ -47,10 +48,40 @@ describe("session lifecycle", () => {
     const s = new StorySession(story,()=>{});
     const pending = s.turn();
     await vi.waitFor(() => expect(mocks.playBlob).toHaveBeenCalledOnce());
-    s.pause(); await pending;
+    s.pauseNarrator(); await pending;
     await s.turn();
     expect(s.view.pages).toHaveLength(1);
     expect(mocks.playBlob).toHaveBeenCalledTimes(2);
+    s.close();
+  });
+  it("keeps listening when only the narrator is paused", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    s.pauseNarrator();
+    expect(s.view.listening).toBe(true);
+    expect(s.view.pauseMode).toBe("narrator");
+    expect(mocks.micStop).not.toHaveBeenCalled();
+    const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
+    onFinal("Give the tortoise roller skates");
+    await vi.waitFor(() => expect(s.view.pauseMode).toBe("none"));
+    expect(s.view.state.log.some(entry => entry.kind === "child" && entry.text.includes("roller skates"))).toBe(true);
+    s.close();
+  });
+  it("stops listening with a full pause and reconnects on resume", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    const oldFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
+    s.pauseAll();
+    expect(s.view.listening).toBe(false);
+    expect(s.view.pauseMode).toBe("all");
+    expect(mocks.micStop).toHaveBeenCalledOnce();
+    oldFinal("This should be ignored");
+    expect(mocks.streamTurn).not.toHaveBeenCalled();
+    await s.resume();
+    expect(mocks.micStart).toHaveBeenCalledTimes(2);
+    expect(s.view.listening).toBe(true);
+    expect(s.view.pauseMode).toBe("none");
+    expect(mocks.streamTurn).toHaveBeenCalledOnce();
     s.close();
   });
   it("completes missing audio for saved interrupted pages", async () => {

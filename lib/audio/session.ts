@@ -12,6 +12,7 @@ export interface SessionView {
   status: string;
   error: string;
   listening: boolean;
+  pauseMode: "none" | "narrator" | "all";
   imageBusy: boolean;
   videoBusy: boolean;
 }
@@ -41,7 +42,7 @@ export class StorySession {
   private snapshotting = false;
   private prefetched?: PreparedTurn;
   constructor(story: StoryDef, private update: (view: SessionView) => void, restored?: SessionView) {
-    this.view = restored ? { ...restored, listening: false, imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, imageBusy: false, videoBusy: false };
+    this.view = restored ? { ...restored, listening: false, pauseMode: "none", imageBusy: false, videoBusy: false } : { state: initialState(story, "listen"), pages: [], status: "Ready when you are", error: "", listening: false, pauseMode: "none", imageBusy: false, videoBusy: false };
   }
   private emit() { if (!this.closed) this.update({ ...this.view, pages: [...this.view.pages] }); }
   warmup() {
@@ -74,11 +75,36 @@ export class StorySession {
     return prepared;
   }
   stopTurn() { clearTimeout(this.timer); this.generation++; this.controller?.abort(); }
-  pause() { this.paused = true; this.stopTurn(); this.discardPrefetch(); this.view.status = "Paused"; this.emit(); }
+  private stopNarration() { this.paused = true; this.stopTurn(); this.discardPrefetch(); }
+  pauseNarrator() {
+    this.stopNarration();
+    this.view.pauseMode = "narrator";
+    this.view.status = this.view.listening ? "Narrator paused. You can speak." : "Narrator paused";
+    this.emit();
+  }
+  pauseAll() {
+    this.stopNarration();
+    this.mic?.stop(); this.mic = undefined;
+    this.view.listening = false;
+    this.view.pauseMode = "all";
+    this.view.status = "Story and microphone paused";
+    this.emit();
+  }
+  async resume() {
+    if (this.view.pauseMode === "all" && this.view.state.mode === "play") {
+      await this.mode("play");
+      if (!this.view.listening) return;
+    }
+    await this.turn();
+  }
   async mode(mode: Mode) {
     this.discardPrefetch();
     this.mic?.stop(); this.mic = undefined;
     this.view.state = { ...this.view.state, mode }; this.view.listening = false;
+    if (this.view.pauseMode === "all" && mode === "listen") {
+      this.view.pauseMode = "narrator";
+      this.view.status = "Narrator paused";
+    }
     this.emit();
     if (mode === "play") {
       const mic = this.mic = new Microphone();
@@ -88,7 +114,13 @@ export class StorySession {
           text => { if (this.mic === mic && !this.echo(text)) void this.turn(text); },
           error => { this.view.error = error; this.view.listening = false; this.emit(); },
         );
-        if (this.mic === mic && !this.closed) this.view.listening = true;
+        if (this.mic === mic && !this.closed) {
+          this.view.listening = true;
+          if (this.view.pauseMode !== "none") {
+            this.view.pauseMode = "narrator";
+            this.view.status = "Narrator paused. You can speak.";
+          }
+        }
       } catch (e) { this.view.error = String((e as Error).message); }
       this.emit();
     }
@@ -109,7 +141,7 @@ export class StorySession {
   }
   async turn(text?: string) {
     if (this.closed || this.snapshotting || (this.view.state.ended && !text && !this.pendingPage)) return;
-    this.stopTurn(); this.paused = false;
+    this.stopTurn(); this.paused = false; this.view.pauseMode = "none";
     const generation = this.generation;
     let controller = this.controller = new AbortController();
     const current = () => !this.closed && generation === this.generation;
@@ -219,8 +251,7 @@ export class StorySession {
   }
   async snapshot() {
     this.snapshotting = true;
-    this.pause();
-    this.mic?.stop(); this.mic = undefined; this.view.listening = false; this.emit();
+    this.pauseAll();
     try {
       await Promise.all([...this.imageJobs]);
       // Interrupted pages still need complete audio for offline replay.
