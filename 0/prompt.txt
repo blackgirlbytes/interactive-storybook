@@ -1,0 +1,35 @@
+okay lets look at fal skills [https://fal.ai/docs/documentation/agent/skills](https://fal.ai/docs/documentation/agent/skills)
+
+I wanna figure out which ones are relevant to me and what things i can improve
+
+---
+
+i have a question..how come every time u open the book..the illustration is different..like if i close the book and come back on a different day
+
+---
+
+yes i think they should be consistent too.
+
+---
+
+how would we do this
+
+---
+
+fal cant do this technology wise? i dont want to be in the loop
+
+---
+
+and is this true..i thought i already had something that would keep the illustrations mostly the same..is that what ur referring to
+
+---
+
+ook lets do it. whats your plan first then implement
+
+---
+
+did you install the fal skill
+
+---
+
+what i know they dont run in my storybook..and theyre installed into the agent..but we shouldve installed them into codex so we can properly make the update without guessing
