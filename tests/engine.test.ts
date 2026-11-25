@@ -11,8 +11,8 @@ import { isAllowedVoice } from "@/lib/voices";
 const story = CLASSIC_STORIES.find(s => s.id === "tortoise-and-hare")!;
 const turn = (extra = {}) => TurnSchema.parse({ segments: [{ speaker: "narrator", text: "Once upon a time." }], ...extra });
 describe("story schema and classics", () => {
-  it("has four valid stories and distinct valid character voices", () => {
-    expect(CLASSIC_STORIES).toHaveLength(4);
+  it("has five valid stories and distinct valid character voices", () => {
+    expect(CLASSIC_STORIES).toHaveLength(5);
     for (const s of CLASSIC_STORIES) {
       expect(StoryStateSchema.safeParse(initialState(s,"listen")).success).toBe(true);
       const voices = [s.narratorVoice,...s.characters.map(c => c.voice)];
