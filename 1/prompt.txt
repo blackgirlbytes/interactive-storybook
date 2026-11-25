@@ -1,0 +1,13 @@
+can you look into MCP events
+
+---
+
+aMCP events is a new spec..its not in my project..look it up
+
+---
+
+im trying to figure out how i would incorporate something like that..or maybe it wouldnt make sense because there's no mcp server here
+
+---
+
+im trying to figure out a use case for an external agent
