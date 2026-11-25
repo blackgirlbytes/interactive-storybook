@@ -3,7 +3,7 @@
   "checkpoint_id": "01M886BMPBXC8D7FREFQTPC7JZ",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 4,
   "files_touched": [
     "app/api/create/route.ts",
     "app/api/phonics/route.ts",
@@ -40,24 +40,31 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 15424,
+    "input_tokens": 30375,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 389632,
-    "output_tokens": 3252,
-    "api_call_count": 7
+    "cache_read_tokens": 664704,
+    "output_tokens": 4636,
+    "api_call_count": 12
   },
   "redaction": {
-    "replacements": 17,
+    "replacements": 23,
     "layers": {
       "betterleaks": 3,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 2,
       "credentialed_uri": 0,
-      "entropy": 15,
+      "entropy": 23,
       "key_context": 0,
       "provider_token": 0,
       "shell_stdin": 0
