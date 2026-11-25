@@ -126,6 +126,22 @@ describe("Flux microphone", () => {
     expect(stopTrack).toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
+  it("keeps a final transcript received while the recorder is draining", async () => {
+    fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
+    const final = vi.fn();
+    const mic = new Microphone();
+    await mic.start(vi.fn(), final, vi.fn());
+    const socket = Socket.latest;
+    const recorder = Recorder.latest;
+    recorder.stop.mockImplementationOnce(() => { recorder.state = "inactive"; });
+    socket.message({ type: "TurnInfo", event: "Update", transcript: "A purple dragon" });
+    const finishing = mic.finish();
+    socket.message({ type: "TurnInfo", event: "EndOfTurn", transcript: "A purple dragon with wings" });
+    expect(final).not.toHaveBeenCalled();
+    recorder.onstop?.();
+    await expect(finishing).resolves.toBe("A purple dragon with wings");
+    expect(socket.send).not.toHaveBeenCalledWith(JSON.stringify({ type: "ForceEndTurn" }));
+  });
   it("closes straight away when the child isn't speaking", async () => {
     fetchMock.mockResolvedValue(Response.json({ token: "temporary-token" }));
     const mic = new Microphone();

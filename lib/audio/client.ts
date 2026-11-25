@@ -196,6 +196,9 @@ export class Microphone {
   private turnText = "";
   /** Set while finish() waits for Flux to send the final words of the turn. */
   private ending?: (text: string) => void;
+  /** Capture an EndOfTurn that arrives while the recorder is handing over its last chunk. */
+  private draining = false;
+  private finalDuringDrain = "";
 
   async start(onInterim: (text: string) => void, onFinal: (text: string) => void, onError: (message: string) => void, onSpeechStart?: () => void) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error("Microphone needs HTTPS or localhost and a supported browser.");
@@ -227,9 +230,10 @@ export class Microphone {
         if (msg.type !== "TurnInfo") return;
         const text = msg.transcript?.trim() ?? "";
         if (msg.event === "EndOfTurn") {
+          if (this.draining && (text || this.turnText)) this.finalDuringDrain = text || this.turnText;
           this.inTurn = false; this.turnText = "";
           if (this.ending) this.ending(text);
-          else if (text) onFinal(text);
+          else if (text && !this.draining) onFinal(text);
           return;
         }
         this.inTurn = true;
@@ -259,6 +263,7 @@ export class Microphone {
     const socket = this.socket;
     if (this.stopped || !socket || socket.readyState !== WebSocket.OPEN) { this.stop(); return ""; }
     this.stopped = true;
+    this.draining = true;
     const recorder = this.recorder;
     if (recorder?.state === "recording") {
       // The recorder hands over its last chunk just before it fires "stop".
@@ -269,7 +274,7 @@ export class Microphone {
       });
     }
     this.stream?.getTracks().forEach(t => t.stop());
-    let text = "";
+    let text = this.finalDuringDrain;
     if (this.inTurn && socket.readyState === WebSocket.OPEN) {
       text = await new Promise<string>(resolve => {
         const timer = setTimeout(() => done(this.turnText), timeoutMs);
@@ -278,6 +283,7 @@ export class Microphone {
         socket.send(JSON.stringify({ type: "ForceEndTurn" }));
       });
     }
+    this.draining = false;
     this.stop();
     return text.trim();
   }

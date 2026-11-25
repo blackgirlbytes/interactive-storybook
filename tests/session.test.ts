@@ -39,8 +39,8 @@ describe("session lifecycle", () => {
     await s.mode("play");
     const firstTurn = s.turn();
     await vi.waitFor(() => expect(mocks.playBlob).toHaveBeenCalledTimes(2));
-    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
-    onSpeechStart();
+    const onInterim = mocks.micStart.mock.calls[0][0] as (text: string) => void;
+    onInterim("Give the dragon a balloon instead");
     await firstTurn;
     await s.turn("Give the dragon a balloon instead");
     const nextState = mocks.streamTurn.mock.calls.find(([state]) => state.log.at(-1)?.kind === "child")![0];
@@ -61,8 +61,8 @@ describe("session lifecycle", () => {
     await s.mode("play");
     const firstTurn = s.turn();
     await vi.waitFor(() => expect(mocks.playBlob).toHaveBeenCalledOnce());
-    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
-    onSpeechStart();
+    const onInterim = mocks.micStart.mock.calls[0][0] as (text: string) => void;
+    onInterim("Make the hero a dragon");
     await firstTurn;
     await s.turn("Make the hero a dragon");
     const nextState = mocks.streamTurn.mock.calls.find(([state]) => state.log.at(-1)?.kind === "child")![0];
@@ -110,13 +110,33 @@ describe("session lifecycle", () => {
     const s = new StorySession(story, () => {});
     await s.mode("play");
     await s.turn();
-    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
-    onSpeechStart();
+    const onInterim = mocks.micStart.mock.calls[0][0] as (text: string) => void;
+    onInterim("The tortoise finds a bicycle");
     await vi.advanceTimersByTimeAsync(8000);
     expect(mocks.streamTurn).toHaveBeenCalledTimes(2);
     const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
     onFinal("The tortoise finds a bicycle");
     await vi.waitFor(() => expect(mocks.streamTurn.mock.calls.some(([state]) => state.log.at(-1)?.text === "The tortoise finds a bicycle")).toBe(true));
+    s.close();
+  });
+  it("does not interrupt narration or its next-page timer for microphone echo", async () => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    let finishPlayback!: () => void;
+    mocks.playBlob.mockImplementationOnce(() => new Promise<void>(resolve => { finishPlayback = resolve; }));
+    const opening = s.turn();
+    await vi.waitFor(() => expect(mocks.playBlob).toHaveBeenCalledOnce());
+    const signal = mocks.streamTurn.mock.calls[0][1] as AbortSignal;
+    const onInterim = mocks.micStart.mock.calls[0][0] as (text: string) => void;
+    const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
+    onInterim("Once upon a time.");
+    onFinal("Once upon a time.");
+    expect(signal.aborted).toBe(false);
+    finishPlayback();
+    await opening;
+    await vi.advanceTimersByTimeAsync(8000);
+    expect(s.view.pages).toHaveLength(2);
+    expect(s.view.state.log.some(entry => entry.kind === "child" && entry.text === "Once upon a time.")).toBe(false);
     s.close();
   });
   it("discards the prepared page when a child answers just before the timeout", async () => {
@@ -125,8 +145,8 @@ describe("session lifecycle", () => {
     await s.turn();
     const unused = mocks.streamTurn.mock.calls[1][1] as AbortSignal;
     await vi.advanceTimersByTimeAsync(7999);
-    const onSpeechStart = mocks.micStart.mock.calls[0][3] as () => void;
-    onSpeechStart();
+    const onInterim = mocks.micStart.mock.calls[0][0] as (text: string) => void;
+    onInterim("The hare finds a bicycle");
     const onFinal = mocks.micStart.mock.calls[0][1] as (text: string) => void;
     onFinal("The hare finds a bicycle");
     await vi.waitFor(() => expect(mocks.streamTurn.mock.calls.some(([state]) =>
@@ -192,6 +212,7 @@ describe("session lifecycle", () => {
     oldFinal("An ignored late answer");
     await vi.advanceTimersByTimeAsync(8000);
     expect(s.view.pages.length).toBeGreaterThan(pagesBefore);
+    expect(s.view.state.log.some(entry => entry.kind === "child" && entry.text === "An ignored late answer")).toBe(false);
     s.view.error = "Previous microphone error";
     await s.resumeMicrophone();
     expect(mocks.micStart).toHaveBeenCalledTimes(2);
@@ -236,6 +257,24 @@ describe("session lifecycle", () => {
     const snapshot = await s.snapshot();
     expect(snapshot.state.log.at(-1)).toMatchObject({ kind: "child", text: "Add a purple dragon" });
     expect(mocks.streamTurn).not.toHaveBeenCalled();
+    s.close();
+  });
+  it.each(["full pause", "save"])("keeps pending microphone words when Pause mic is followed by %s", async next => {
+    const s = new StorySession(story, () => {});
+    await s.mode("play");
+    let finish!: (text: string) => void;
+    mocks.micFinish.mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
+    s.pauseMicrophone();
+    const pending = next === "save" ? s.snapshot() : (s.pauseAll(), s.resume());
+    finish("A bright purple dragon");
+    if (next === "save") {
+      const saved = await pending as Awaited<ReturnType<typeof s.snapshot>>;
+      expect(saved.state.log.at(-1)).toMatchObject({ kind: "child", text: "A bright purple dragon" });
+      expect(mocks.streamTurn).not.toHaveBeenCalled();
+    } else {
+      await pending;
+      expect(mocks.streamTurn.mock.calls[0][0].log.at(-1)).toMatchObject({ kind: "child", text: "A bright purple dragon" });
+    }
     s.close();
   });
   it("completes missing audio for saved interrupted pages", async () => {
@@ -293,6 +332,25 @@ describe("session lifecycle", () => {
     finish(video);
     await vi.waitFor(() => expect(s.view.videoBusy).toBe(false));
     expect(s.view.pages.map(p => p.video)).toEqual([video, video]);
+    s.close();
+    vi.unstubAllGlobals();
+  });
+  it("keeps a completed clip when a custom story reuses the same scene", async () => {
+    const image = new Blob(["image"], { type: "image/jpeg" });
+    const video = new Blob(["video"], { type: "video/mp4" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(image)));
+    mocks.post.mockResolvedValue({ url: "https://v3.fal.media/files/scene.jpg", dataUri: "data:image/jpeg;base64,aW1hZ2U=" });
+    mocks.animateScene.mockResolvedValue(video);
+    mocks.streamTurn.mockImplementationOnce(async (_state, _signal, onSegment) => {
+      reply.segments.forEach(onSegment);
+      return { ...reply, stateChanges: { plotNotes: ["Hare naps in a new place"] }, imagePrompt: "Hare naps under a tree" };
+    });
+    const s = new StorySession(story, () => {});
+    await s.turn();
+    await vi.waitFor(() => expect(s.view.pages[0].video).toBe(video));
+    await s.turn("The hare wakes up");
+    expect(s.view.pages[1].image).toBe(s.view.pages[0].image);
+    expect(s.view.pages[1].video).toBe(video);
     s.close();
     vi.unstubAllGlobals();
   });

@@ -110,7 +110,7 @@ describe("standard story illustrations", () => {
     await session.turn("Give Tilly roller skates");
     await vi.waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(1));
     expect(mocks.post.mock.calls[0][1].standardArt).toEqual({ storyId: story.id, beatIndex: 0 });
-    expect(session.view.pages[0].standardArtUrl).toBeUndefined();
+    await vi.waitFor(() => expect(session.view.pages[0].standardArtUrl).toBeUndefined());
     session.close();
   });
 

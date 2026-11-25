@@ -125,9 +125,6 @@ Use 2-4 characters and 4-6 beats with a clear beginning, a fun problem, and a ha
 ${voicesFor(language).map((v) => `- ${v.name}: ${v.desc}`).join("\n")}`;
 }
 
-
-export const CREATE_SYSTEM = createSystem();
-
 export function buildCreateUser(messages: { role: "guide" | "child"; text: string }[]): string {
   if (messages.length === 0) return "Start the conversation: greet the child and ask who the hero of their story should be.";
   const convo = messages.map((m) => `${m.role === "guide" ? "GUIDE" : "CHILD"}: ${m.text}`).join("\n");

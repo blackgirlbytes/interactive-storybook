@@ -111,8 +111,6 @@ export function voicesFor(language: LanguageCode): Voice[] {
   return ALL_VOICES.filter((v) => v.language === language);
 }
 
-export const VOICE_NAMES = FLUX_VOICES.map((v) => v.name);
-
 export const voiceModel = (name: string, language: LanguageCode = DEFAULT_LANGUAGE) => `flux-${name}-${language}`;
 
 const BY_MODEL = new Map(ALL_VOICES.map((v) => [voiceModel(v.name, v.language), v]));
@@ -129,8 +127,6 @@ export function narratorFor(language: LanguageCode): string {
 export function voiceInfo(model: string | undefined): Voice | undefined {
   return model ? BY_MODEL.get(model) : undefined;
 }
-
-
 
 // Stories saved or created before the Flux switch store Aura-2 voices. Each maps to a different
 // Flux voice so characters that sounded different still do.

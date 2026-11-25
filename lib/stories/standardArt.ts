@@ -1,21 +1,17 @@
 import type { StoryDef } from "@/lib/types";
+import { CLASSIC_STORIES } from "@/lib/stories";
 
 /** These files are generated once and shipped with the built-in books. */
-const PAGE_COUNTS: Record<string, number> = {
-  "noahs-ark": 6,
-  "three-little-pigs": 5,
-  "tortoise-and-hare": 5,
-  "little-red-riding-hood": 5,
-  "first-christmas": 6,
-};
+const PAGE_COUNTS = new Map(CLASSIC_STORIES.map(story => [story.id, story.beats.length]));
+const STANDARD_ART_URLS = new Set(CLASSIC_STORIES.flatMap(story =>
+  story.beats.map((_, index) => `/story-art/${story.id}/beat-${index}.jpg`)));
 
 export function standardArtUrl(story: StoryDef, beatIndex: number): string | undefined {
-  const count = PAGE_COUNTS[story.id];
+  const count = PAGE_COUNTS.get(story.id);
   if (story.category === "custom" || count === undefined || !Number.isInteger(beatIndex) || beatIndex < 0 || beatIndex >= count) return;
   return `/story-art/${story.id}/beat-${beatIndex}.jpg`;
 }
 
 export function isStandardArtUrl(url: string): boolean {
-  return Object.entries(PAGE_COUNTS).some(([id, count]) =>
-    Array.from({ length: count }, (_, index) => `/story-art/${id}/beat-${index}.jpg`).includes(url));
+  return STANDARD_ART_URLS.has(url);
 }

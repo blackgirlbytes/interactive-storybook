@@ -28,7 +28,7 @@ body {
     var(--paper);
   background-attachment: fixed;
 }
-h1, h2, h3, .brand, .book-label strong, .speech-note, .narration p, .chat-message p, .interaction-bar label, .phonics-part {
+h1, h2, h3, .brand, .narration p, .chat-message p, .interaction-bar label, .phonics-part {
   font-family: var(--font-display), Georgia, serif;
 }
 h1 { letter-spacing: -1.4px; font-weight: 500; }
@@ -87,13 +87,7 @@ footer .brand { color: var(--lamp); }
 
 /* hero */
 .hero-book { background: var(--night-2); border: 6px solid #2a335f; box-shadow: 10px 14px 0 #0a0e24, 0 30px 90px rgba(242, 189, 87, .10); }
-.book-label { background: var(--night-2); }
-.book-label span { color: var(--lamp); font-size: 11px; }
-.book-label strong { color: var(--ink); }
 .orbit-star { color: var(--lamp); }
-/* tucked into the empty sky at the top-left, clear of the characters and the book label */
-.speech-note { top: 34px; bottom: auto; left: -34px; max-width: 176px; padding: 10px 14px; font-size: 14px; line-height: 1.35; transform: rotate(-3deg); border-radius: 14px 14px 14px 2px; background: #f6ecd7; color: #23203d; border-color: #e9dcbf; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
-@media (max-width: 700px) { .speech-note { top: 10px; left: -14px; max-width: 150px; font-size: 13px; } }
 .how-strip, .how-strip > div { border-color: var(--line); }
 .step-icon { border-color: rgba(242, 189, 87, .4); color: var(--lamp-strong); }
 
@@ -145,15 +139,26 @@ footer .brand { color: var(--lamp); }
 .skip-link { background: var(--lamp); color: var(--on-lamp); }
 
 /* language, read-along and phonics */
-.language-picker { font-size: 13px; color: var(--muted); }
-.language-picker select { background: var(--night-3); color: var(--ink); border-color: var(--line); }
+.reader-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.language-picker { display: inline-flex; align-items: center; gap: 14px; font-size: 13px; color: var(--muted); }
+.language-picker span { white-space: nowrap; }
+.language-picker-control { position: relative; display: inline-flex; color: var(--ink); }
+.language-picker-control::after { content: ""; position: absolute; right: 24px; top: 50%; width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-70%) rotate(45deg); pointer-events: none; }
+.language-picker select { appearance: none; width: 100%; font: inherit; color: var(--ink); background: var(--night-3); border: 1px solid var(--line); border-radius: 8px; min-height: 42px; max-width: 100%; padding: 10px 52px 10px 14px; }
+.language-picker select:disabled { opacity: .6; }
+.chat-card .language-picker { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+@media (max-width: 480px) { .reader-tools { width: 100%; justify-content: flex-start; } .language-picker { width: 100%; flex-direction: column; align-items: stretch; gap: 6px; } .language-picker select { width: 100%; } }
+.narration .word { border-radius: 4px; transition: background-color .12s ease, color .12s ease; }
 .narration .reading-word { background: rgba(242, 189, 87, .3); color: var(--ink); box-shadow: 0 0 0 2px rgba(242, 189, 87, .3); }
-.narration .word.tappable { text-decoration-color: rgba(242, 189, 87, .5); }
+.narration .word.tappable { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-decoration: underline dotted rgba(242, 189, 87, .5); text-underline-offset: 5px; }
 .narration .word.tappable:hover, .narration .word.tappable:focus-visible { background: rgba(243, 234, 216, .1); }
 .narration .word.tappable.reading-word { background: rgba(242, 189, 87, .3); }
-.phonics-card { background: var(--night-3); border-color: var(--line); }
-.phonics-part { background: rgba(243, 234, 216, .07); color: var(--muted); }
-.phonics-part.lit { background: var(--lamp); color: var(--on-lamp); }
+.phonics-card { width: 100%; border: 1px solid var(--line); background: var(--night-3); border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; }
+.phonics-card .eyebrow { margin-bottom: 12px; }
+.phonics-parts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.phonics-part { font: 600 34px/1.2 var(--font-display), Georgia, serif; padding: 6px 14px; border-radius: 10px; background: rgba(243, 234, 216, .07); color: var(--muted); transition: all .15s ease; }
+.phonics-part.lit { background: var(--lamp); color: var(--on-lamp); transform: translateY(-2px); }
+.phonics-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .nav nav a { white-space: nowrap; }
 @media (max-width: 700px) {

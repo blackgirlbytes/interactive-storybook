@@ -3,9 +3,7 @@ import { voiceModel as v } from "@/lib/voices";
 
 export const ART_STYLE =
   "Rich gouache and ink children's picture book illustration set at twilight and under moonlight: deep indigo and blue shadows, warm lamplight-gold glows from lanterns, windows and fireflies, soft silvery rim light on the characters, fine hand-drawn ink outlines, textured paper grain, friendly expressive characters, cozy and magical, never scary, no text or letters";
-
-const CHRISTMAS_ART_STYLE =
-  "Rich gouache and ink children's picture book illustration set at twilight and under moonlight: deep indigo and blue shadows, warm lamplight-gold glows from lanterns and windows, soft silvery rim light on the characters, fine hand-drawn ink outlines, textured paper grain, friendly expressive characters, cozy and magical, never scary, no text or letters";
+const CHRISTMAS_ART_STYLE = ART_STYLE.replace("lanterns, windows and fireflies", "lanterns and windows");
 
 export const CLASSIC_STORIES: StoryDef[] = [
   {

@@ -28,6 +28,7 @@ export default function Replay({ id }: { id: string }) {
   function pause() { controller.current?.abort(); setPlaying(false); setReading(undefined); }
   async function play() {
     if (!adventure) return;
+    setWord(undefined);
     pause(); const c = controller.current = new AbortController(); setPlaying(true); setError("");
     try {
       for (let p = index; p < adventure.pages.length; p++) {

@@ -131,6 +131,9 @@ export class StorySession {
   /** Turns the mic off, keeping a half-finished idea as story input for when the story resumes. */
   private async keepLastWords(mic: Microphone) {
     const text = await mic.finish().catch(() => "");
+    this.rememberLastWords(text);
+  }
+  private rememberLastWords(text: string) {
     if (!text || this.closed || this.echo(text)) return;
     this.rememberHeardNarration();
     this.view.state = { ...addChildUtterance(this.view.state, text), ended: false };
@@ -149,7 +152,9 @@ export class StorySession {
     this.emit();
     if (mic) {
       const words: Promise<void> = mic.finish().then(text => {
-        if (text && this.canAcceptMicrophoneWords() && !this.echo(text)) void this.turn(text);
+        if (!text || this.closed || this.echo(text)) return;
+        if (this.canAcceptMicrophoneWords() && !this.snapshotting) void this.turn(text);
+        else this.rememberLastWords(text);
       }).catch(() => {}).finally(() => { if (this.lastWords === words) this.lastWords = undefined; });
       this.lastWords = words;
     }
@@ -229,30 +234,29 @@ export class StorySession {
     if (mode === "play") await this.startMicrophone(wasAwaitingChild);
   }
   private async startMicrophone(wasAwaitingChild: boolean, resumed = false) {
-      const mic = this.mic = new Microphone(storyLanguage(this.view.state.story));
-      try {
-        await mic.start(
-          text => { if (!this.closed && this.mic === mic && !this.echo(text)) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
-          text => { if (this.mic === mic && !this.echo(text)) void this.turn(text); },
-          error => { if (this.mic !== mic) return; mic.stop(); this.mic = undefined; this.view.error = error; this.view.listening = false; this.view.micPaused = true; this.emit(); },
-          () => { if (!this.closed && this.mic === mic) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
-        );
-        if (this.mic === mic && !this.closed) {
-          this.view.listening = true;
-          this.view.micPaused = false;
-          if (resumed) this.view.error = "";
-          if (this.view.pauseMode !== "none") {
-            this.view.pauseMode = "narrator";
-            this.view.status = "Narrator paused. You can speak.";
-          } else if (wasAwaitingChild) {
-            this.awaitingChild = true;
-            this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, CHILD_REPLY_WAIT_MS);
-          } else if (resumed) {
-            this.view.status = "Microphone on. You can speak.";
-          }
+    const mic = this.mic = new Microphone(storyLanguage(this.view.state.story));
+    try {
+      await mic.start(
+        text => { if (!this.closed && this.mic === mic && !this.echo(text)) { this.stopTurn(); this.view.status = "I’m listening…"; this.emit(); } },
+        text => { if (this.mic === mic && !this.echo(text)) void this.turn(text); },
+        error => { if (this.mic !== mic) return; mic.stop(); this.mic = undefined; this.view.error = error; this.view.listening = false; this.view.micPaused = true; this.emit(); },
+      );
+      if (this.mic === mic && !this.closed) {
+        this.view.listening = true;
+        this.view.micPaused = false;
+        if (resumed) this.view.error = "";
+        if (this.view.pauseMode !== "none") {
+          this.view.pauseMode = "narrator";
+          this.view.status = "Narrator paused. You can speak.";
+        } else if (wasAwaitingChild) {
+          this.awaitingChild = true;
+          this.timer = setTimeout(() => { if (!this.paused) void this.turn(); }, CHILD_REPLY_WAIT_MS);
+        } else if (resumed) {
+          this.view.status = "Microphone on. You can speak.";
         }
-      } catch (e) { if (this.mic === mic) { this.mic = undefined; this.view.error = String((e as Error).message); this.view.micPaused = true; } }
-      this.emit();
+      }
+    } catch (e) { if (this.mic === mic) { this.mic = undefined; this.view.error = String((e as Error).message); this.view.micPaused = true; } }
+    this.emit();
   }
   /** Follows a segment's playback and moves the read-along highlight from word to word. */
   private follow(page: AdventurePage, segment: number, recording: Blob | Promise<Blob>): OnTime {
@@ -315,12 +319,12 @@ export class StorySession {
       this.prefetched = undefined;
       controller = this.controller = prepared.controller;
       const previous = this.view.pages.at(-1);
-      const readyArt = !text && !this.customized && !base.plotNotes.length &&
-        !base.characters.some(character => character.invented)
-        ? standardArtUrl(base.story, base.beatIndex) : undefined;
+      let storyChanged = this.customized || base.plotNotes.length > 0 ||
+        base.characters.some(character => character.invented);
+      const readyArt = storyChanged ? undefined : standardArtUrl(base.story, base.beatIndex);
       const page: AdventurePage = {
         segments: [], audio: [], image: readyArt ? undefined : previous?.image,
-        video: undefined, standardArtUrl: readyArt,
+        video: readyArt ? undefined : previous?.video, standardArtUrl: readyArt,
       };
       const active: ActiveNarration = { base, page, heardCount: 0, referenceUrl: this.referenceUrl };
       this.activeNarration = active;
@@ -369,9 +373,8 @@ export class StorySession {
       const standardUrl = standardArtUrl(base.story, base.beatIndex);
       this.customized ||= !!text && (!!turn.stateChanges.plotNotes?.length ||
         !!turn.stateChanges.addObjects?.length || !!turn.stateChanges.addCharacters?.length);
-      const changedStory = this.customized || base.plotNotes.length > 0 || !!turn.stateChanges.plotNotes?.length ||
-        !!turn.stateChanges.addCharacters?.length || base.characters.some(character => character.invented);
-      if (standardUrl && !changedStory) this.illustrateStandard(page, standardUrl, turn.imagePrompt ?? base.story.beats[base.beatIndex].goal, turn.motionPrompt ?? undefined);
+      storyChanged ||= this.customized || !!turn.stateChanges.plotNotes?.length || !!turn.stateChanges.addCharacters?.length;
+      if (standardUrl && !storyChanged) this.illustrateStandard(page, standardUrl, turn.imagePrompt ?? base.story.beats[base.beatIndex].goal, turn.motionPrompt ?? undefined);
       else if (turn.imagePrompt) this.illustrate(page, turn.imagePrompt, turn.motionPrompt ?? undefined, base.beatIndex);
       schedule();
       // Prepare the next text and voice while this page plays. A child's answer discards it.
