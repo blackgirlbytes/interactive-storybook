@@ -1,0 +1,5 @@
+do u see an AGENTS.MD
+
+---
+
+can you add that to the agents.md that every change should be committed
