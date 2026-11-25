@@ -91,7 +91,9 @@ footer .brand { color: var(--lamp); }
 .book-label span { color: var(--lamp); font-size: 11px; }
 .book-label strong { color: var(--ink); }
 .orbit-star { color: var(--lamp); }
-.speech-note { background: #f6ecd7; color: #23203d; border-color: #e9dcbf; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+/* tucked into the empty sky at the top-left, clear of the characters and the book label */
+.speech-note { top: 34px; bottom: auto; left: -34px; max-width: 176px; padding: 10px 14px; font-size: 14px; line-height: 1.35; transform: rotate(-3deg); border-radius: 14px 14px 14px 2px; background: #f6ecd7; color: #23203d; border-color: #e9dcbf; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+@media (max-width: 700px) { .speech-note { top: 10px; left: -14px; max-width: 150px; font-size: 13px; } }
 .how-strip, .how-strip > div { border-color: var(--line); }
 .step-icon { border-color: rgba(242, 189, 87, .4); color: var(--lamp-strong); }
 
